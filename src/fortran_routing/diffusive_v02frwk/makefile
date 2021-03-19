@@ -18,19 +18,8 @@ diffusive.o: maindiff_v2.f90
 pydiffusive.o: pymaindiff_v2.f90
 	$(FC) $(FCFLAGS) -o $@ $<
 
-#reservoir:  precis.mod module_levelpool.o pymodule_levelpool.o
-
-#precis.mod: varPrecision.f90
-#	$(FC) $(FCFLAGS) $<
-
-#install:
-#	cp *.o ../../../../src/python_routing_v02/fast_reach
-
-#%.o: %.F
-#	$(FC) $(FCFLAGS) -o $@ $<
-
-#%.o: %.f90
-#	$(FC) $(FCFLAGS) -o $@ $<
+install:
+	cp *.o ../../../src/python_routing_v02/fast_reach
 
 clean:
 	rm -f *.o *.mod
