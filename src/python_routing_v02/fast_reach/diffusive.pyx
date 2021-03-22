@@ -2,6 +2,8 @@ import cython
 
 from fortran_wrappers cimport c_diffnw
 
+# TO DO load some example inputs to test the module
+
 cdef struct QE:
     double q_ev_g,
     double elv_ev_g
