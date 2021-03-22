@@ -2,8 +2,12 @@ import cython
 
 from fortran_wrappers cimport c_diffnw
 
+cdef struct QE:
+    double q_ev_g,
+    double elv_ev_g
+
 @cython.boundscheck(False)
-cef void diffnw(double dtini_g,
+cdef void diffnw(double dtini_g,
              double t0_g,
              double tfin_g,
              double saveinterval_g,
@@ -16,26 +20,26 @@ cef void diffnw(double dtini_g,
              int nts_db_g,
              int mxncomp_g,
              int nrch_g,
-             double[:,::1] z_ar_g,
-             double[:,::1] bo_ar_g,
-             double[:,::1] traps_ar_g,
-             double[:,::1] tw_ar_g,
-             double[:,::1] twcc_ar_g,
-             double[:,::1] mann_ar_g,
-             double[:,::1] manncc_ar_g,
-             double[:,::1] so_ar_g,
-             double[:,::1] dx_ar_g,
+             double z_ar_g,
+             double bo_ar_g,
+             double traps_ar_g,
+             double tw_ar_g,
+             double twcc_ar_g,
+             double mann_ar_g,
+             double manncc_ar_g,
+             double so_ar_g,
+             double dx_ar_g,
              int nhincr_m_g,
              int nhincr_f_g,
-             double[:,:,::1] ufhlt_m_g,
-             double[:,:,::1] ufqlt_m_g,
-             double[:,:,::1] ufhlt_f_g,
-             double[:,:,::1] ufqlt_f_g,
+             double ufhlt_m_g,
+             double ufqlt_m_g,
+             double ufhlt_f_g,
+             double ufqlt_f_g,
              int frnw_col,
-             int[:,::1] frnw_g,
-             double[:,:,::1] qlat_g,
-             double[:,::1] ubcd_g,
-             double[:] dbcd_g,
+             int frnw_g,
+             double qlat_g,
+             double ubcd_g,
+             double dbcd_g,
              double cfl_g,
              double theta_g,
              int tzeq_flag_g,
@@ -45,8 +49,8 @@ cef void diffnw(double dtini_g,
              QE *rv) nogil:
     
     cdef:
-        double[:,:,::1] q_ev_g,
-        double[:,:,::1] elv_ev_g
+        double q_ev_g
+        double elv_ev_g
         
     c_diffnw(
             &dtini_g,
