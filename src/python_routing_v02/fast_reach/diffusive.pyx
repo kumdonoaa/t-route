@@ -53,8 +53,6 @@ cdef void diffnw(double dtini_g,
         double[::1,:,:] q_ev_g = np.empty([ntss_ev_g,mxncomp_g,nrch_g], dtype = np.double, order = 'F') 
         double[::1,:,:] elv_ev_g = np.empty([ntss_ev_g,mxncomp_g,nrch_g], dtype = np.double, order = 'F') 
     
-    print("here, before fortran call")
-    
     c_diffnw(
             &dtini_g,
             &t0_g,
@@ -97,8 +95,6 @@ cdef void diffnw(double dtini_g,
             &ntss_ev_g,
             &q_ev_g[0,0,0],
             &elv_ev_g[0,0,0])
-    
-    print("here: after fortran")
     
     # copy data from Fortran to Python memory view
     out_q[:,:,:] = q_ev_g[::1,:,:]
