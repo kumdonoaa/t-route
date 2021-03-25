@@ -64,6 +64,7 @@ def read_custom_input(custom_input_file):
         output_parameters,
         run_parameters,
         parity_parameters,
+        diffusive_parameters,
     )
 
 
