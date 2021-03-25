@@ -54,6 +54,7 @@ def read_custom_input(custom_input_file):
     output_parameters = data.get("output_parameters", {})
     run_parameters = data.get("run_parameters", {})
     parity_parameters = data.get("parity_parameters", {})
+    diffusive_parameters = data.get("diffusive_parameters",{})
     # TODO: add error trapping for potentially missing files
     return (
         supernetwork_parameters,
