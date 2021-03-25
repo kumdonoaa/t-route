@@ -23,7 +23,7 @@ subroutine c_diffnw(dtini_g, t0_g, tfin_g, saveinterval_g, saveinterval_ev_g, dt
     real(c_double), dimension(mxncomp_g, nrch_g, nhincr_m_g), intent(in) :: ufhlt_m_g,  ufqlt_m_g
     real(c_double), dimension(mxncomp_g, nrch_g, nhincr_f_g), intent(in) :: ufhlt_f_g, ufqlt_f_g
     integer(c_int), intent(in) :: frnw_col
-    integer(c_int), dimension(nrch_g, frnw_col), intent(in) :: frnw_g
+    real(c_double), dimension(nrch_g, frnw_col), intent(in) :: frnw_g
     real(c_double), dimension(nts_ql_g, mxncomp_g, nrch_g), intent(in) :: qlat_g
     real(c_double), dimension(nts_ub_g, nrch_g), intent(in) :: ubcd_g
     real(c_double), dimension(nts_db_g), intent(in) :: dbcd_g
