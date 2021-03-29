@@ -127,9 +127,8 @@ def get_ql_from_csv(qlat_input_file, index_col=0):
     qlat_input_file: comma delimted file with header giving timesteps, rows for each segment
     index_col = 0: column/field in the input file with the segment/link id
     """
-    ql = pd.read_csv(qlat_input_file, index_col=index_col)
-    ql.index = ql.index.astype(int)
-    ql.columns = ql.columns.astype(int)
+    ql = pd.read_csv(qlat_input_file, index_col=index_col)    
+    ql.index = ql.index.astype('int')
     ql = ql.sort_index(axis="index")
     return ql.astype("float32")
 
