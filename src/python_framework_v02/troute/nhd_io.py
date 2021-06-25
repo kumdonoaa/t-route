@@ -19,7 +19,7 @@ def read_netcdf(geo_file_path):
 
 
 def read_csv(geo_file_path, header="infer", layer_string=None):
-    if geo_file_path.suffix == ".zip":
+    if geo_file_path.endswith(".zip"):
         if layer_string is None:
             raise ValueError("layer_string is needed if reading from compressed csv")
         with zipfile.ZipFile(geo_file_path, "r") as zcsv:
@@ -34,7 +34,7 @@ def read_geopandas(geo_file_path, layer_string=None, driver_string=None):
 
 
 def read(geo_file_path, layer_string=None, driver_string=None):
-    if geo_file_path.suffix == ".nc":
+    if geo_file_path.endswith(".nc"):
         return read_netcdf(geo_file_path)
     else:
         return read_geopandas(
@@ -101,7 +101,6 @@ def read_custom_input(custom_input_file):
     data_assimilation_parameters = data.get("data_assimilation_parameters", {})
     diffusive_parameters = data.get("diffusive_parameters", {})
     coastal_parameters = data.get("coastal_parameters", {})
-
     # TODO: add error trapping for potentially missing files
     return (
         supernetwork_parameters,
@@ -195,6 +194,7 @@ def get_ql_from_csv(qlat_input_file, index_col=0):
     """
     ql = pd.read_csv(qlat_input_file, index_col=index_col)
     ql.index = ql.index.astype(int)
+    ql.columns = ql.columns.astype(int)
     ql = ql.sort_index(axis="index")
     return ql.astype("float32")
 
