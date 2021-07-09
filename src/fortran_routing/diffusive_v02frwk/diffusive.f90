@@ -1,11 +1,11 @@
 module diffusive
     !*-------------------------------------------------------------------------------------------------
     !*       A diffusive model developed by Tulane University (Prof.Ehab Meselhe and
-    !*		Dr.Md Nazmul Azim Beg) and integrated into a Python routing framework By Dong Ha Kim at
-    !*          the National Water Center. Basically, the partial differential equation of diffusive
-    !*          wave is numerically solved using Crank-Nicoloson and Hermite Interpolation techniques.
-    !*          Water depth computation produces either normal depth or diffusive depth, the selection
-    !*          of which is determined mainly by dimensionless diffusion coefficient.
+    !*       Dr.Md Nazmul Azim Beg) and integrated into a Python routing framework by Dong Ha Kim at
+    !*       the National Water Center. Basically, the partial differential equation of diffusive
+    !*       wave is numerically solved using Crank-Nicoloson and Hermite Interpolation techniques.
+    !*       Water depth computation produces either normal depth or diffusive depth, the selection
+    !*       of which is determined mainly by dimensionless diffusion coefficient.
     !*-------------------------------------------------------------------------------------------------
     implicit none
 !    !* symbolic names for kind types of 4-, 2-, and 1-byte integers:
@@ -15,8 +15,6 @@ module diffusive
 !    !* symbolic names for kind types of single- and double-precision reals:
 !    integer, parameter :: sp = kind(1.0)
 !    integer, parameter :: dp = kind(1.0d0)
-
-! test github <- written in a branch
 
     double precision, parameter :: grav = 9.81
     double precision, parameter :: TOLERANCE = 1e-8
@@ -132,7 +130,7 @@ contains
         tfin= tfin_g
         ntim = floor( (tfin - t0) / dtini * 3600)
         timesDepth= 4.0 !* water depth multiplier used in readXsection
-        nel= nel_g
+        nel= 501 !nel_g
         saveInterval= saveInterval_ev_g
         saveFrequency = saveInterval / dtini_given
         num_points= mxncomp
@@ -656,6 +654,22 @@ contains
             newArea=-999
             pere=-999
         enddo  ! end of time loop
+
+        deallocate(frnw_g)
+        deallocate(area, bo, pere, areap, qp, z, dqp, dqc, dap, dac, depth, sk, co, dx)
+        deallocate(volRemain, froud, courant, oldQ, newQ, oldArea, newArea, oldY, newY)
+        deallocate(lateralFlow, celerity, diffusivity, celerity2, diffusivity2)
+        deallocate(eei, ffi, exi, fxi, qpx, qcx)
+        deallocate(dimensionless_Cr, dimensionless_Fo, dimensionless_Fi)
+        deallocate(dimensionless_Di, dimensionless_Fc, dimensionless_D)
+        deallocate(lowerLimitCount, higherLimitCount, currentRoutingNormal, routingNotChanged)
+        deallocate(elevTable, areaTable, pereTable, rediTable, convTable, topwTable)
+        deallocate( skkkTable, nwi1Table, dPdATable, ncompElevTable, ncompAreaTable)
+        deallocate(xsec_tab, rightBank, leftBank, skLeft, skMain, skRight)
+        deallocate(currentSquareDepth, ini_y, ini_q, notSwitchRouting, currentROutingDiffusive )
+        deallocate(tarr_ql, varr_ql, tarr_ub, varr_ub)
+
+
     endsubroutine diffnw
     !*--------------------------------------------
     !          Interpolate in time
