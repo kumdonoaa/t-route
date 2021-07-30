@@ -3,64 +3,65 @@ module arrays_module
     implicit none
     save
 
-    real, allocatable :: area(:), bo(:,:) !, y(:, :), q(:, :)
-    !real, allocatable :: areap(:), qp(:), z(:), dqp(:)
-    real, allocatable :: av11(:), av12(:), av21(:), av22(:)
-    real, allocatable ::  ci1(:), ci2(:)!, dqc(:), dap(:), dac(:)
-    real, allocatable :: aso(:,:), f1(:), f2(:), depth(:)
-    real, allocatable :: g11inv(:), g12inv(:), g21inv(:), g22inv(:)
-    real, allocatable :: b11(:), b12(:), b21(:), b22(:)
-    real, allocatable :: eps2(:), eps4(:), d1(:), d2(:), u(:), c(:)
-    real, allocatable :: co(:), gso(:,:), dbdx(:,:)!,sk(:)
-    real, allocatable :: dx(:,:), froud(:), courant(:)
-    real, allocatable :: dt(:)
+    double precision, allocatable :: area(:), bo(:,:) !, y(:, :), q(:, :)
+    !double precision, allocatable :: areap(:), qp(:), z(:), dqp(:)
+    double precision, allocatable :: av11(:), av12(:), av21(:), av22(:)
+    double precision, allocatable ::  ci1(:), ci2(:)!, dqc(:), dap(:), dac(:)
+    double precision, allocatable :: aso(:,:), f1(:), f2(:), depth(:)
+    double precision, allocatable :: g11inv(:), g12inv(:), g21inv(:), g22inv(:)
+    double precision, allocatable :: b11(:), b12(:), b21(:), b22(:)
+    double precision, allocatable :: eps2(:), eps4(:), d1(:), d2(:), u(:), c(:)
+    double precision, allocatable :: co(:), gso(:,:), dbdx(:,:)!,sk(:)
+    double precision, allocatable :: dx(:,:), froud(:), courant(:)
+    double precision, allocatable :: dt(:)
 
 	!**arrays for branching channel application
     integer, allocatable :: ndep(:), uslinks(:,:), dslink(:), instrdflag(:,:), nx1(:)
-    !real, allocatable :: y(:, :, :), q(:, :, :), qlat(:,:,:), bo(:, :), traps(:,:) !,area(:,:), areafnal(:,:,:),
-    real, allocatable :: areap(:, :), qp(:, :, :), z(:, :), sk(:, :)            ! change 20210628
+    !double precision, allocatable :: y(:, :, :), q(:, :, :), qlat(:,:,:), bo(:, :), traps(:,:) !,area(:,:), areafnal(:,:,:),
+    double precision, allocatable :: areap(:, :), qp(:, :, :), z(:, :), sk(:, :)            ! change 20210628
 
 
-    real, allocatable :: dqp(:,:), dap(:,:), dqc(:,:), dac(:,:)
+    double precision, allocatable :: dqp(:,:), dap(:,:), dqc(:,:), dac(:,:)
 
 
-    real, allocatable :: celerity(:,:),velocity(:,:), diffusivity(:,:), diffusivity2(:), celerity2(:)
+    double precision, allocatable :: celerity(:,:),velocity(:,:), diffusivity(:,:), diffusivity2(:), celerity2(:)
 
-    real, allocatable :: eei(:), ffi(:), exi(:), fxi(:), qpx(:,:), qcx(:)
+    double precision, allocatable :: eei(:), ffi(:), exi(:), fxi(:), qpx(:,:), qcx(:)
 
-    real, allocatable :: USBoundary(:,:,:), DSBoundary(:,:,:)
+    double precision, allocatable :: USBoundary(:,:,:), DSBoundary(:,:,:)
     integer, allocatable :: upBoundTableEntry(:), downBoundTableEntry(:) !, normalDepth(:,:)
 ! change for unsteady flow
-    real, allocatable :: pere(:,:),dpda(:)
+    double precision, allocatable :: pere(:,:),dpda(:)
 
-    real, allocatable :: oldQ(:,:), newQ(:,:,:), oldArea(:,:), newArea(:,:), oldY(:,:), newY(:,:), normalDepthAtNodes(:,:)      ! change 20210628
-    real, allocatable :: added_Q(:,:,:)                                                                                         ! change 20210713
+    double precision, allocatable :: oldQ(:,:), newQ(:,:,:), oldArea(:,:), newArea(:,:) 
+	double precision, allocatable :: oldY(:,:), newY(:,:), normalDepthAtNodes(:,:)      ! change 20210628
+    double precision, allocatable :: added_Q(:,:,:)                                                                                         ! change 20210713
 
     integer, allocatable :: ityp(:), latFlowLocations(:,:), dataInEachLatFlow(:,:), latFlowType(:,:), latFlowXsecs(:,:)
-    real, allocatable :: lateralFlowTable(:,:,:,:), lateralFlow(:,:,:)
+    double precision, allocatable :: lateralFlowTable(:,:,:,:), lateralFlow(:,:,:)
 
     ! for additional lateral flow of the structures
     integer, allocatable :: latFlowLocations2(:,:), dataInEachLatFlow2(:,:), latFlowType2(:,:), latFlowXsecs2(:,:), noLatFlow2(:)
-    real, allocatable :: lateralFlowTable2(:,:,:,:), lateralFlow2(:,:)
+    double precision, allocatable :: lateralFlowTable2(:,:,:,:), lateralFlow2(:,:)
 
-    real, allocatable :: dimensionless_Cr(:,:), dimensionless_Fo(:,:), dimensionless_Fi(:,:)
-    real, allocatable :: dimensionless_Di(:,:), dimensionless_Fc(:,:), dimensionless_D(:,:)
+    double precision, allocatable :: dimensionless_Cr(:,:), dimensionless_Fo(:,:), dimensionless_Fi(:,:)
+    double precision, allocatable :: dimensionless_Di(:,:), dimensionless_Fc(:,:), dimensionless_D(:,:)
 
-    real, allocatable :: ini_y(:), ini_q(:)
-    real, allocatable :: ini_q_repeat(:,:), ini_E(:,:), ini_F(:,:)
+    double precision, allocatable :: ini_y(:), ini_q(:)
+    double precision, allocatable :: ini_q_repeat(:,:), ini_E(:,:), ini_F(:,:)
 
     integer, allocatable :: Q_sk_tableEntry(:,:), noLatFlow(:), noQSKtable(:)
-    real, allocatable :: eachQSKtableNodeRange(:,:,:), Q_sk_Table(:,:,:,:)
+    double precision, allocatable :: eachQSKtableNodeRange(:,:,:), Q_sk_Table(:,:,:,:)
 
-    real, allocatable :: lowerLimitCount(:), higherLimitCount(:), volRemain(:,:)
+    double precision, allocatable :: lowerLimitCount(:), higherLimitCount(:), volRemain(:,:)
 
     character(len=128), allocatable :: downstream_path(:), xSection_path(:), manning_strickler_path(:), upstream_path(:),dx_path(:)
     character(len=128), allocatable :: QSKtablePath(:), lateralFlow_path(:), lateralFlow_path2(:)
     character(len=128), allocatable :: bankLocation_path(:)
-    real, allocatable :: leftBank(:,:), rightBank(:,:), skLeft(:,:), skMain(:,:), skRight(:,:)
+    double precision, allocatable :: leftBank(:,:), rightBank(:,:), skLeft(:,:), skMain(:,:), skRight(:,:)
 
     integer, allocatable :: currentROutingDiffusive(:), notSwitchRouting(:)
-    real :: minDx, maxCelerity,maxCelDx
+    double precision :: minDx, maxCelerity,maxCelDx
 
     integer, allocatable :: currentRoutingNormal(:,:), routingNotChanged(:,:)
 
