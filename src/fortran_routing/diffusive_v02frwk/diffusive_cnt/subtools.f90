@@ -9,38 +9,72 @@ module subtools
 contains
 
 
-    subroutine calc_q_sk_multi(i,j,currentQ,q_sk_multi)
-        implicit none
+    ! subroutine calc_q_sk_multi(i,j,currentQ,q_sk_multi)
+        ! implicit none
 
-        integer,intent(in) :: i, j
-        real,intent(in) :: currentQ
-        real,intent(out) :: q_sk_multi
-        integer :: pp, tableLength
-        real :: r_interpo_nn
+        ! integer,intent(in) :: i, j
+        ! real,intent(in) :: currentQ
+        ! real,intent(out) :: q_sk_multi
+        ! integer :: pp, tableLength
+        ! double precision :: r_interpol_nn
 
-        q_sk_multi = 1.0
-        do pp = 1, noQSKtable(j)
-            if (  ( eachQSKtableNodeRange(1,pp,j) - i) * ( eachQSKtableNodeRange(2,pp,j) - i) .le. 0 ) then
-                tableLength = Q_sk_tableEntry(pp,j)
-                q_sk_multi = r_interpo_nn(Q_Sk_Table(1,1:tableLength,pp,j), &
-                Q_Sk_Table(2,1:tableLength,pp,j),tableLength,currentQ)
-            end if
-        end do
+        ! q_sk_multi = 1.0
+        ! do pp = 1, noQSKtable(j)
+            ! if (  ( eachQSKtableNodeRange(1,pp,j) - i) * ( eachQSKtableNodeRange(2,pp,j) - i) .le. 0 ) then
+                ! tableLength = Q_sk_tableEntry(pp,j)
+                ! q_sk_multi = r_interpol_nn(Q_Sk_Table(1,1:tableLength,pp,j), &
+                ! Q_Sk_Table(2,1:tableLength,pp,j),tableLength,currentQ)
+            ! end if
+        ! end do
 
-        !if (q_sk_multi .lt. 1.0) print*, j,noQSKtable(j),q_sk_multi
-        !if (q_sk_multi .lt. 1.0) pause 101
+        ! !if (q_sk_multi .lt. 1.0) print*, j,noQSKtable(j),q_sk_multi
+        ! !if (q_sk_multi .lt. 1.0) pause 101
 
-        !print*, '101',j, q_sk_multi
+        ! !print*, '101',j, q_sk_multi
 
-    end subroutine
+    ! contains
+		
+		! !*--------------------------------------------------
+		! !*        Nearest Neighbour Interpolation
+		! !
+		! !*--------------------------------------------------
+		! double precision function r_interpol_nn(x,y,jj,xt)
+
+			! integer, intent(in) :: jj
+			! real, intent(in) :: xt, x(jj), y(jj)
+			! integer :: j
+
+			! real :: yt
+
+			! ! nn means nearest neighbour
+
+			! if (xt.le. x(1)) then
+				! yt=y(1)
+			! elseif (xt.ge. x(jj)) then
+				! yt=y(jj)
+			! else
+				! do j=1,jj-1
+					! if((x(j)-xt)*(x(j+1)-xt).le.0)then
+
+						! yt=(xt-x(j))/(x(j+1)-x(j))*(y(j+1)-y(j))+y(j)
+
+						! EXIT
+					! endif
+				! end do
+			! end if
+			! r_interpol_nn = yt
+			! return
+		! end function
+	
+	! end subroutine
 
 
     subroutine r_interpol(x,y,kk,xrt,yt)
         implicit none
 
     integer, intent(in) :: kk
-    real, intent(in) :: xrt, x(kk), y(kk)
-    real, intent(out) :: yt
+    double precision, intent(in) :: xrt, x(kk), y(kk)
+    double precision, intent(out) :: yt
     integer :: k
 
     if (xrt.le.maxval(x) .and. xrt.ge.minval(x)) then
@@ -86,9 +120,9 @@ end subroutine
 
         implicit none
 
-        real,intent(in) :: y_mn, bo_mn, slp, n_mn
-        real,intent(out) :: q_mn
-        real :: ar, peri, hydr
+        double precision,intent(in) :: y_mn, bo_mn, slp, n_mn
+        double precision,intent(out) :: q_mn
+        double precision :: ar, peri, hydr
         integer :: chshp
 
         !+++----------------------------------------------------+
@@ -130,9 +164,9 @@ end subroutine
         implicit none
 
         integer, intent(in) :: i, j
-        real, intent(in) :: q_sk_multi, So, dsc
-        real, intent(out) :: y_norm, y_crit, area_n, area_c
-        real :: area_0, width_0, errorY, pere_0,hydR_0,skk_0!, fro
+        double precision, intent(in) :: q_sk_multi, So, dsc
+        double precision, intent(out) :: y_norm, y_crit, area_n, area_c
+        double precision :: area_0, width_0, errorY, pere_0,hydR_0,skk_0!, fro
         integer :: trapnm_app, recnm_app, iter
 
         !print*, 'here', i, j, q_sk_multi, So, dsc, y_norm, y_crit, area_n, area_c
@@ -167,70 +201,6 @@ end subroutine
 
     end subroutine normal_crit_y
 
-    subroutine normal_crit_y_old(i, j, q_sk_multi, So, dsc, y_norm, y_crit, area_n, area_c)
-
-        implicit none
-
-        integer, intent(in) :: i, j
-        real, intent(in) :: q_sk_multi, So, dsc
-        real, intent(out) :: y_norm, y_crit, area_n, area_c
-        real :: area_0, width_0, errorY, pere_0,hydR_0,skk_0!, fro
-        integer :: trapnm_app, recnm_app, iter
-
-
-            elevTable = xsec_tab(1,:,i,j)
-            areaTable = xsec_tab(2,:,i,j)
-            pereTable = xsec_tab(3,:,i,j)
-            topwTable = xsec_tab(6,:,i,j)
-            skkkTable = xsec_tab(11,:,i,j)
-            !print*, 'initial ara 0', oldY(i,j)
-            call r_interpol(elevTable,areaTable,nel,oldY(i,j),area_0) ! initial estimate
-            if (area_0 .eq. -9999) then
-                print*, 'At j = ',j,', i = ',i, 'interpolation of area_0 in calculating normal area was not possible'
-                stop
-            end if
-            call r_interpol(elevTable,topwTable,nel,oldY(i,j),width_0) ! initial estimate
-            call r_interpol(elevTable,topwTable,nel,oldY(i,j),skk_0) ! initial estimate
-
-            !print*, 'initial ara 0', area_0
-
-            area_c=area_0
-            errorY = 100.
-            !pause
-            do while (errorY .gt. 0.0001)
-                !print*, '11', area_0
-                call r_interpol(areaTable,pereTable,nel,area_0,pere_0)
-                if (pere_0 .eq. -9999) then
-                    print*, 'At j = ',j,', i = ',i, 'interpolation of pere_0 in calculating normal area was not possible Q=', &
-                     dsc, 'slope=',So, 'area=', area_0
-                    stop
-                end if
-                hydR_0 = area_0 / pere_0
-                call r_interpol(areaTable,skkkTable,nel,area_0,skk_0)
-                !print*, '12', hydR_0
-                area_n = dsc/skk_0/q_sk_multi/ hydR_0 ** (2./3.) / sqrt(So)
-                !print*, '13', dsc, area_n
-
-                errorY = abs(area_n - area_0)
-                area_0 = area_n
-                !print*, 'area_0', area_n,'hydR_0', hydR_0
-                area_c = (dsc * dsc * width_0 / grav) ** (1./3.)
-                call r_interpol(areaTable,topwTable,nel,area_c, width_0)
-                !print*,j,i,area_n, errorY
-                !fro=abs(dsc)/sqrt(grav*area_c**3.0/width_0)
-            enddo
-
-            call r_interpol(areaTable,elevTable,nel,area_0,y_norm)
-            if (y_norm .eq. -9999) then
-                print*, 'At j = ',j,', i = ',i, 'interpolation of y_norm in calculating normal area was not possible, Q', &
-                dsc,'slope',So!,'lateralFlow', lateralFlow(1:nx1(j),j)
-                stop
-            end if
-            call r_interpol(areaTable,elevTable,nel,area_c,y_crit)
-
-    end subroutine normal_crit_y_old
-
-
 !+++-------------------------------------------------------------------------------
 !+ computation of alternate depth
 !+++-------------------------------------------------------------------------------
@@ -240,9 +210,9 @@ end subroutine
         implicit none
 
         integer, intent(in) :: i, j
-        real, intent(in) :: dsc, y_n, y_crit
-        real, intent(out) :: y_alt, area_alt
-        real :: area_0, area_n, width_n, vel, froud, y1, y2, toll, h1, vel_0, y_0
+        double precision, intent(in) :: dsc, y_n, y_crit
+        double precision, intent(out) :: y_alt, area_alt
+        double precision :: area_0, area_n, width_n, vel, froud, y1, y2, toll, h1, vel_0, y_0
         integer :: iii
 
 
@@ -299,9 +269,9 @@ end subroutine
         implicit none
 
         integer, intent(in) :: i, j
-        real, intent(in) :: dsc, y_n
-        real, intent(out) :: y_cnj, area_cnj
-        real :: area_0, area_n, width_n, vel, froud, y1, y2, toll, h1, vel_0, y_0
+        double precision, intent(in) :: dsc, y_n
+        double precision, intent(out) :: y_cnj, area_cnj
+        double precision :: area_0, area_n, width_n, vel, froud, y1, y2, toll, h1, vel_0, y_0
         integer :: iii
 
 
@@ -332,11 +302,11 @@ end subroutine
 
         implicit none
 
-        real, intent(in) :: sslp, bwd, dsc
-        real, intent(out) :: ycr
-        real :: Axs, Bxs, c1, dbdy, fy, dfdy, ycrnew
-        real :: errNR, tolNR
-        real :: dmy, epsc, tc0, etac
+        double precision, intent(in) :: sslp, bwd, dsc
+        double precision, intent(out) :: ycr
+        double precision :: Axs, Bxs, c1, dbdy, fy, dfdy, ycrnew
+        double precision :: errNR, tolNR
+        double precision :: dmy, epsc, tc0, etac
         integer :: trapcr_app, chshp
 
         tolNR=0.01  !*tolerance
@@ -394,10 +364,10 @@ end subroutine
 !+++----------------------------------------------------------------------------
     subroutine conjugatedep(ycj1 ,sslp, bwd, dsc, ycj2)
         implicit none
-        real, intent(in) :: ycj1, sslp, bwd, dsc
-        real, intent(out) :: ycj2
-        real :: Axs, Fr1
-        real uwQ, xcj, eta, kcj, delta, tcj, ycj0, lamX
+        double precision, intent(in) :: ycj1, sslp, bwd, dsc
+        double precision, intent(out) :: ycj2
+        double precision :: Axs, Fr1
+        double precision uwQ, xcj, eta, kcj, delta, tcj, ycj0, lamX
         integer iter, mxiter, trapcj_app
         integer :: chshp
 
@@ -448,8 +418,8 @@ end subroutine
 
         implicit none
 
-        real, intent(in) :: sslp, bwd, Axs
-        real, intent(out) :: dpth
+        double precision, intent(in) :: sslp, bwd, Axs
+        double precision, intent(out) :: dpth
         integer :: chshp
 
         if (chshp==1) then
@@ -469,8 +439,8 @@ end subroutine
     subroutine areacalc(yxs, sslp, bwd, Axs)
           implicit none
 
-        real, intent(in) :: yxs, sslp, bwd
-        real, intent(out) :: Axs
+        double precision, intent(in) :: yxs, sslp, bwd
+        double precision, intent(out) :: Axs
         integer :: chshp
 
         if (chshp==1) then
@@ -490,8 +460,8 @@ end subroutine
 
         implicit none
 
-        real, intent(in) :: yxs, sslp, bwd, Axs
-        real, intent(out) :: I1
+        double precision, intent(in) :: yxs, sslp, bwd, Axs
+        double precision, intent(out) :: I1
         integer :: chshp
 
         if (chshp==1) then
@@ -512,8 +482,8 @@ end subroutine
 
         implicit none
 
-        real, intent(in) :: yxs, sslp, bwd, Axs
-        real, intent(out) :: hydR
+        double precision, intent(in) :: yxs, sslp, bwd, Axs
+        double precision, intent(out) :: hydR
         integer :: chshp, gdI2dA
 
         if (chshp==1) then
@@ -534,9 +504,9 @@ end subroutine
 
         implicit none
 
-        real, intent(in) :: yxs, sslp, bwd, Axs
-        real, intent(out) :: cA
-        real :: b24sa, h, sxbsh, dhdA, the1, the2, dycdA, yc, dycAdA
+        double precision, intent(in) :: yxs, sslp, bwd, Axs
+        double precision, intent(out) :: cA
+        double precision :: b24sa, h, sxbsh, dhdA, the1, the2, dycdA, yc, dycAdA
         integer :: chshp, gdI2dA
 
 
@@ -571,9 +541,9 @@ end subroutine
 
         implicit none
 
-        real, intent(in) :: manN, sslp, bwd, Axs
-        real, intent(out) :: dkda
-        real :: eta, pi, phi
+        double precision, intent(in) :: manN, sslp, bwd, Axs
+        double precision, intent(out) :: dkda
+        double precision :: eta, pi, phi
         integer :: chshp, gdI2dA
 
         if (chshp==1) then
@@ -600,8 +570,8 @@ end subroutine
 
         implicit none
 
-        real, intent(in) :: sslp, bwd, Axs, dsgmdx
-        real, intent(out) :: gdI2dA
+        double precision, intent(in) :: sslp, bwd, Axs, dsgmdx
+        double precision, intent(out) :: gdI2dA
         integer :: chshp
 
         if (chshp==1) then
@@ -613,6 +583,5 @@ end subroutine
         end if
 
     end subroutine gdI2dAcalc
-
 
  end module

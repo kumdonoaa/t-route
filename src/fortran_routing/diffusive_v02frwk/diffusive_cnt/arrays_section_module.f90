@@ -3,15 +3,15 @@ module arrays_section_module
     implicit none
     save
 
-    real, allocatable :: elevTable(:),areaTable(:)
-    real, allocatable :: pereTable(:),rediTable(:)
-    real, allocatable :: convTable(:),topwTable(:)
-    real, allocatable :: nwi1Table(:),dPdATable(:)
-    real, allocatable :: ncompElevTable(:), ncompAreaTable(:), skkkTable(:)
+    double precision, allocatable :: elevTable(:),areaTable(:)
+    double precision, allocatable :: pereTable(:),rediTable(:)
+    double precision, allocatable :: convTable(:),topwTable(:)
+    double precision, allocatable :: nwi1Table(:),dPdATable(:)
+    double precision, allocatable :: ncompElevTable(:), ncompAreaTable(:), skkkTable(:)
 ! only in version 2 20191511
-    real, allocatable :: I2Tablep(:),I2Tablec(:)
-    real, allocatable :: upstreamI2Tablec(:), downstreamI2Tablep(:)
-    real, allocatable :: currentSquareDepth(:), currentCubicDepth(:), downstreamSquareDepth(:), upstreamSquareDepth(:)
+    double precision, allocatable :: I2Tablep(:),I2Tablec(:)
+    double precision, allocatable :: upstreamI2Tablec(:), downstreamI2Tablep(:)
+    double precision, allocatable :: currentSquareDepth(:), currentCubicDepth(:), downstreamSquareDepth(:), upstreamSquareDepth(:)
 
     integer :: maxTableLength, nel
 

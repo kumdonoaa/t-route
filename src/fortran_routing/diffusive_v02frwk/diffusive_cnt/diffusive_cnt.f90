@@ -7,7 +7,13 @@ module diffusive
     !*       Water depth computation produces either normal depth or diffusive depth, the selection
     !*       of which is determined mainly by dimensionless diffusion coefficient.
     !*-------------------------------------------------------------------------------------------------
-    implicit none
+	use constants_module
+	use arrays_module
+	use var_module
+	use arrays_section_module
+	use xsec_attribute_module
+	
+	implicit none
 !    !* symbolic names for kind types of 4-, 2-, and 1-byte integers:
 !    integer, parameter :: i4b = selected_int_kind(9)
 !    integer, parameter :: i2b = selected_int_kind(4)
@@ -16,46 +22,40 @@ module diffusive
 !    integer, parameter :: sp = kind(1.0)
 !    integer, parameter :: dp = kind(1.0d0)
 
-    double precision, parameter :: grav = 9.81
-    double precision, parameter :: TOLERANCE = 1e-8
-    integer :: nlinks, mxncomp, maxTableLength, nel
-    double precision :: dtini, dxini, cfl, minDx, maxCelerity,  theta, min_Q					! change Nazmul CNT
-    double precision :: frus2, minNotSwitchRouting, minNotSwitchRouting2
+    ! double precision :: minNotSwitchRouting, minNotSwitchRouting2
 
-    double precision, dimension(:), allocatable :: area, depth, co, froud, courant
-    double precision, dimension(:,:), allocatable :: bo, dx
-	!**arrays for branching channel application
-    double precision, dimension(:,:), allocatable :: areap, z, sk								! change Nazmul CNT
-	double precision, dimension(:,:,:), allocatable :: qp										! change Nazmul CNT
-    double precision, dimension(:,:), allocatable :: dqp, dap, dqc, dac
-    double precision, dimension(:,:), allocatable :: celerity, velocity, diffusivity, qpx		! change Nazmul CNT
-    double precision, dimension(:), allocatable :: eei, ffi, exi, fxi, qcx, diffusivity2, celerity2
-    ! change for unsteady flow
-    double precision, dimension(:,:), allocatable :: pere, oldQ, oldArea, newArea, oldY, newY	! change Nazmul CNT
-	double precision, dimension(:,:,:), allocatable :: newQ, lateralFlow, added_Q				! change Nazmul CNT
-	double precision, dimension(:,:), allocatable :: ini_q_repeat, ini_E, ini_F					! change Nazmul CNT
-    double precision, dimension(:,:), allocatable :: dimensionless_Cr, dimensionless_Fo, dimensionless_Fi
-    double precision, dimension(:,:), allocatable :: dimensionless_Di, dimensionless_Fc, dimensionless_D
-    double precision, dimension(:), allocatable :: ini_y, ini_q
-    double precision, dimension(:), allocatable :: lowerLimitCount, higherLimitCount
-    double precision, dimension(:,:), allocatable :: volRemain
-    integer, dimension(:), allocatable :: currentROutingDiffusive, notSwitchRouting
-    integer, dimension(:,:), allocatable :: currentRoutingNormal, routingNotChanged
+    ! double precision, dimension(:), allocatable :: depth, co, froud, courant
+    ! double precision, dimension(:,:), allocatable :: dx
+	! !**arrays for branching channel application
+    ! double precision, dimension(:,:), allocatable :: z, sk								! change Nazmul CNT
+    ! double precision, dimension(:,:), allocatable :: dap, dqc, dac
+    ! double precision, dimension(:,:), allocatable :: celerity, velocity, diffusivity, qpx		! change Nazmul CNT
+    ! double precision, dimension(:), allocatable :: eei, ffi, exi, fxi, qcx, diffusivity2, celerity2
+    ! ! change for unsteady flow
+    ! double precision, dimension(:,:), allocatable :: pere, oldQ, oldArea, newArea, oldY, newY	! change Nazmul CNT
+	! double precision, dimension(:,:,:), allocatable :: newQ, lateralFlow, added_Q				! change Nazmul CNT
+	! double precision, dimension(:,:), allocatable :: ini_q_repeat, ini_E, ini_F					! change Nazmul CNT
+    ! double precision, dimension(:,:), allocatable :: dimensionless_Cr, dimensionless_Fo, dimensionless_Fi
+    ! double precision, dimension(:,:), allocatable :: dimensionless_Di, dimensionless_Fc, dimensionless_D
+    ! double precision, dimension(:), allocatable :: ini_y, ini_q
+    ! double precision, dimension(:), allocatable :: lowerLimitCount, higherLimitCount
+    ! double precision, dimension(:,:), allocatable :: volRemain
+    ! integer, dimension(:), allocatable :: currentROutingDiffusive, notSwitchRouting
+    ! integer, dimension(:,:), allocatable :: currentRoutingNormal, routingNotChanged
 
-    double precision, dimension(:), allocatable :: elevTable, areaTable, skkkTable
-    double precision, dimension(:), allocatable :: pereTable, rediTable
-    double precision, dimension(:), allocatable :: convTable, topwTable
-    double precision, dimension(:), allocatable :: nwi1Table, dPdATable
-    double precision, dimension(:), allocatable :: ncompElevTable, ncompAreaTable
-    double precision, dimension(:,:,:,:), allocatable :: xsec_tab
-    double precision, dimension(:), allocatable :: currentSquareDepth
+    ! double precision, dimension(:), allocatable :: elevTable, areaTable, skkkTable
+    ! double precision, dimension(:), allocatable :: pereTable, rediTable
+    ! double precision, dimension(:), allocatable :: convTable, topwTable
+    ! double precision, dimension(:), allocatable :: nwi1Table, dPdATable
+    ! double precision, dimension(:), allocatable :: ncompElevTable, ncompAreaTable
+    ! double precision, dimension(:,:,:,:), allocatable :: xsec_tab
+    ! double precision, dimension(:), allocatable :: currentSquareDepth
 
     integer, dimension(:,:), allocatable :: frnw_g
     double precision :: z_g, bo_g, traps_g, tw_g, twcc_g, so_g, mann_g, manncc_g
-    integer :: applyNaturalSection
-    integer :: nel_g
+    integer :: nel_g, mxncomp
     double precision :: dmyt, dmyi, dmyj
-
+	
 contains
     !*--------------------------------------------------------------------------------
     !*       Route network by using Python-to-Fortran network traversal map together
@@ -74,10 +74,13 @@ contains
                         frnw_col, dfrnw_g, qlat_g, ubcd_g, dbcd_g, &
                         cfl_g, theta_g, tzeq_flag_g, y_opt_g, so_llm_g, &
                         ntss_ev_g, q_ev_g, elv_ev_g)
-
-        implicit none
-
-        integer, intent(in) :: mxncomp_g, nrch_g
+	
+		
+		use subtools
+		
+		implicit none
+				
+		integer, intent(in) :: mxncomp_g, nrch_g
         integer, intent(in) :: nts_ql_g, nts_ub_g, nts_db_g, ntss_ev_g
         integer, intent(in) :: nhincr_m_g, nhincr_f_g, frnw_col
         double precision,intent(in) :: dtini_g, t0_g, tfin_g, saveinterval_g, saveinterval_ev_g, dt_ql_g, dt_ub_g, dt_db_g
@@ -98,7 +101,6 @@ contains
 
         double precision, dimension(mxncomp_g, nrch_g), intent(inout) :: so_ar_g
 		double precision, dimension(ntss_ev_g, mxncomp_g, nrch_g), intent(out) :: q_ev_g, elv_ev_g
-        integer :: ncomp
 
         integer :: i, j, k, ppn, qqn, n, ntim, num_time, igate, pp, boundaryFileMaxEntry, saveFrequency
         integer :: linknb_ds, linknb_us, linknb, nodenb
@@ -108,22 +110,18 @@ contains
         double precision :: frds, areasum, yk_ncomp, yav, areak_ncomp, areav, sumOldQ, currentQ, area_ds
         double precision :: arean, areac, hyrdn, hyrdc, perimn, perimc, qcrit, s0ds, timesDepth
         doubleprecision :: latFlowValue, latFlowValue2
-        double precision :: t, r_interpol_time, tfin, t1, t2, t0, ini_time !t0 start time
+        double precision :: t, tfin, t1, t2, t0, ini_time !t0 start time
         integer :: tableLength, timestep, kkk, repeatInterval, totalTimeSteps
         double precision :: area_0, width_0, errorY, hydR_0, q_sk_multi, sumCelerity
-        double precision :: r_interpo_nn
-        double precision :: maxCelDx
         double precision, dimension(:), allocatable :: dmyv, dmyv1, dmyv2
         double precision, dimension(:), allocatable ::tarr_ql, varr_ql, tarr_ub, varr_ub, tarr_db, varr_db
         integer :: frj, iseg, i1, ts_ev
         integer :: num_points, totalChannels
-        double precision, dimension(:,:), allocatable :: leftBank, rightBank
-        double precision, dimension(:,:), allocatable :: skLeft, skMain, skRight
         double precision :: dmy1, dmy2
         integer :: ndata, idmy1, nts_db_g2
         double precision :: slope, y_norm, area_n, temp
-
-        ! simulation timestep
+		
+		! simulation timestep
         dtini=dtini_g
         dtini_given=dtini
 		! simulation intial time (hrs)
@@ -229,7 +227,7 @@ contains
         allocate(tarr_ql(nts_ql_g), varr_ql(nts_ql_g))
         allocate(tarr_ub(nts_ub_g), varr_ub(nts_ub_g))
 
-        ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+		! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 		! identify minimum dx (segment length) in the network
 		! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 		dx = 0.
@@ -272,7 +270,7 @@ contains
 									
 			enddo
 		enddo
-
+		
         ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 		! Populate lateral inflow and upper boundary time arrays
 		! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -372,6 +370,7 @@ contains
 							varr_ql(n)= qlat_g(n,i,j)
 						enddo
 						lateralFlow(i,timestep,j)= intp_y(nts_ql_g, tarr_ql, varr_ql, ini_time+dtini/60.*(timestep-1)) ! tarr_ql in minutes
+						
 					end do
 					
 				end do
@@ -392,7 +391,7 @@ contains
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 			
 			do timestep = 1,repeatInterval,saveFrequency
-				ts_ev = ((ini_time*60.0)/dtini) + (timestep-1)
+				ts_ev = ((ini_time*60.0)/dtini) + (timestep)
 				do j=1,nlinks
 					ncomp = frnw_g(j,1)
 					do i=1, ncomp
@@ -437,7 +436,7 @@ contains
 			! Write depth results to q_ev_g array
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 			do timestep = 1,repeatInterval,saveFrequency
-				ts_ev = ((ini_time*60.0)/dtini) + (timestep-1)
+				ts_ev = ((ini_time*60.0)/dtini) + (timestep)
 				do j=1,nlinks
 					ncomp = frnw_g(j,1)
 					do i=1, ncomp
@@ -449,6 +448,24 @@ contains
 			oldY = newY
 
 		end do ! end kkk loop
+	
+	print *, 'completed diffusive network simulation'
+	
+	deallocate(frnw_g)
+	deallocate(area, bo, pere, areap, qp, z, dqp, dqc, dap, dac, depth, sk, co, dx)
+	deallocate(volRemain, froud, courant, oldQ, newQ, oldArea, newArea, oldY, newY)
+	deallocate(lateralFlow, celerity, diffusivity, celerity2, diffusivity2)
+	deallocate(eei, ffi, exi, fxi, qpx, qcx)
+	deallocate(dimensionless_Cr, dimensionless_Fo, dimensionless_Fi)
+	deallocate(dimensionless_Di, dimensionless_Fc, dimensionless_D)
+	deallocate(lowerLimitCount, higherLimitCount, currentRoutingNormal, routingNotChanged)
+	deallocate(elevTable, areaTable, pereTable, rediTable, convTable, topwTable)
+	deallocate( skkkTable, nwi1Table, dPdATable, ncompElevTable, ncompAreaTable)
+	deallocate(xsec_tab, rightBank, leftBank, skLeft, skMain, skRight)
+	deallocate(currentSquareDepth, ini_y, ini_q, notSwitchRouting, currentROutingDiffusive )
+	deallocate(tarr_ql, varr_ql, tarr_ub, varr_ub)	
+	deallocate(ini_q_repeat, ini_E, ini_F, added_Q, velocity)
+
 	end subroutine diffnw
 	
 ! ###########################################################################################
@@ -469,11 +486,11 @@ contains
 
 		integer, intent(in) :: j, ntim, repeatInterval
 
-		real,allocatable :: E_cnt(:,:), F_cnt(:,:)
+		double precision,allocatable :: E_cnt(:,:), F_cnt(:,:)
 
 		integer :: i, n, kk
 
-		real :: hi, gi, ki, pj, qj, rj, pj_p, qj_p, rj_p, sj_p, mi, ni, qp_ghost, r_interpol_time, qp_ghost_1
+		double precision :: hi, gi, ki, pj, qj, rj, pj_p, qj_p, rj_p, sj_p, mi, ni, qp_ghost, qp_ghost_1
 
 
 	!!++++++++++++++++++++ Diffusive wave Forward sweep starts +++++++++++++++++++!!
@@ -506,14 +523,14 @@ contains
 				qj_p = 1.0 - gi + 4.0 * ki
 				rj_p = -hi / 4.0 + gi / 2.0 - 2.0 * ki
 
-				sj_p = pj_p * qp(i-1,n-1,j) + qj_p * qp(i-1,n,j) + rj_p * qp(i-1,n+1,j) &
-					+ mi / 2.0 * (lateralFlow(i-1,n+1,j) - lateralFlow(i-1,n-1,j) ) &
-					+ ni * lateralFlow(i-1,n,j)
-
 				if (n .eq. ntim) then
 					! applying ghost node !&
 					sj_p = pj_p * qp(i-1,n-1,j) + qj_p * qp(i-1,n,j) + rj_p * qp_ghost_1 &
 					+ mi / 2.0 * (lateralFlow(i-1,n,j) - lateralFlow(i-1,n-1,j) ) &
+					+ ni * lateralFlow(i-1,n,j)
+				else
+					sj_p = pj_p * qp(i-1,n-1,j) + qj_p * qp(i-1,n,j) + rj_p * qp(i-1,n+1,j) &
+					+ mi / 2.0 * (lateralFlow(i-1,n+1,j) - lateralFlow(i-1,n-1,j) ) &
 					+ ni * lateralFlow(i-1,n,j)
 				end if
 
@@ -571,25 +588,33 @@ contains
 
 		integer, intent(in) :: j,ntim,repeatInterval
 
-		real :: a1, a2, a3, a4, b1, b2, b3, b4, dd1, dd2, dd3, dd4, h1, h2, h3, h4, xt
-		real :: qy, qxy, qxxy, qxxxy, ppi, qqi, rri, ssi, sxi, mannings, Sb, width, slope
+		double precision :: a1, a2, a3, a4, b1, b2, b3, b4, dd1, dd2, dd3, dd4, h1, h2, h3, h4, xt
+		double precision :: qy, qxy, qxxy, qxxxy, ppi, qqi, rri, ssi, sxi, mannings, Sb, width, slope
 
-		real :: cour, cour2, q_sk_multi, sfi, r_interpol_time, r_interpo_nn, temp, dkdh
-		real :: D_lim1, D_lim2, y_norm, y_crit, area_n, area_c, chnWidth, vel,y_norm1
+		double precision :: cour, cour2, q_sk_multi, sfi, temp, dkdh
+		double precision :: D_lim1, D_lim2, y_norm, y_crit, area_n, area_c, chnWidth, vel,y_norm1
+		
+		! double precision :: r_interpol_nn, r_interpol_time
 
-		real :: y_norm_ds, y_crit_ds, S_ncomp, frds, area_0, width_0, hydR_0, errorY, currentQ, stg1, stg2
+		double precision :: y_norm_ds, y_crit_ds, S_ncomp, frds, area_0, width_0, hydR_0, errorY, currentQ, stg1, stg2
 		integer :: tableLength, jj, iii
 
-		real :: elevTable_1(nel),areaTable_1(nel),rediTable_1(nel),convTable_1(nel),topwTable_1(nel),currentSquaredDepth_1(nel)
-		real :: dKdATable_1(nel)
-		real :: pereTable_1(nel),depthYi,tempDepthi_1,tempCo_1,temp_q_sk_multi_1,tempY_1,tempArea_1,tempRadi_1,tempbo_1,ffy
-		real :: ffy_1, ffy_2, ffy_3, tempCo_2, tempCo_3, tempsfi_2, tempsfi_3
-		real :: ffprime,tempDepthi_1_new,tempsfi_1,toll, dkda, tempPere_1, tempdKdA_1, tempY_2, tempY_3, temp_v_1, tempDepthi_2
-		real :: skkkTable_1(nel), tempsk_1
-		real :: usFroud, dsFroud, dUdt, eHds, y_alt, area_alt, y_cnj, area_cnj, y_crit_test, y_norm_test
+		double precision :: elevTable_1(nel),areaTable_1(nel),rediTable_1(nel)
+		double precision ::convTable_1(nel),topwTable_1(nel),currentSquaredDepth_1(nel)
+		double precision :: dKdATable_1(nel)
+		double precision :: pereTable_1(nel),depthYi,tempDepthi_1,tempCo_1,temp_q_sk_multi_1,tempY_1,tempArea_1,tempRadi_1,tempbo_1,ffy
+		double precision :: ffy_1, ffy_2, ffy_3, tempCo_2
+		double precision :: tempCo_3, tempsfi_2, tempsfi_3
+		double precision :: ffprime,tempDepthi_1_new,tempsfi_1,toll, dkda, tempPere_1
+		double precision :: tempdKdA_1, tempY_2, tempY_3, temp_v_1, tempDepthi_2
+		double precision :: skkkTable_1(nel), tempsk_1
+		double precision :: usFroud, dsFroud, dUdt, eHds, y_alt, area_alt, y_cnj, area_cnj, y_crit_test, y_norm_test
 		integer :: depthCalOk(ncomp), wlCalcMethod
 
 		integer :: i, pp
+		
+		double precision :: unity
+		unity = 1.0		
 
 	!!++++++++++++++++++++ Diffusive wave Backward sweep starts +++++++++++++++++++!!
 
@@ -605,11 +630,12 @@ contains
 			ncomp = frnw_g(j,1)
 
 			depthCalOk(ncomp) = 1
+			q_sk_multi = 1
 
 			do i=ncomp,1,-1
 
 				currentQ = qp(i,repeatInterval+1,j)
-				call calc_q_sk_multi(i,j,currentQ,q_sk_multi)
+				! call calc_q_sk_multi(i,j,currentQ,q_sk_multi)
 
 				! Calculating : read all attributes from tab file
 				elevTable = xsec_tab(1,:,i,j)
@@ -643,7 +669,7 @@ contains
 
 				sfi = qp(i,repeatInterval+1,j) * abs(qp(i,repeatInterval+1,j)) / ( co(i)** 2.0 )
 				if (abs(qp(i,repeatInterval+1,j)) .lt. min_Q) then
-					sfi = min_Q ** 2.0 * sign(1.0,qp(i,repeatInterval+1,j)) / ( co(i)** 2.0 )
+					sfi = min_Q ** 2.0 * dsign(unity,qp(i,repeatInterval+1,j)) / ( co(i)** 2.0 )
 					! at some head water basin, the Q boundary becomes 0.0 m3/s at some time. If Q = 0, then
 					! sfi = 0. This leads to diffusivity = NaN. To avoid NaN diffusivity, those sfi is calculated using the min_Q
 					! for those cases.
@@ -707,7 +733,8 @@ contains
 							call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempY_2-z(i-1,j))**2.0,tempCo_2)
 							call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempY_3-z(i-1,j))**2.0,tempCo_3)
 
-							call calc_q_sk_multi(i-1,j,qp(i-1,repeatInterval+1,j),temp_q_sk_multi_1)
+							temp_q_sk_multi_1 = 1
+							! call calc_q_sk_multi(i-1,j,qp(i-1,repeatInterval+1,j),temp_q_sk_multi_1)
 							tempCo_1 = tempCo_1 * temp_q_sk_multi_1
 							tempCo_2 = tempCo_2 * temp_q_sk_multi_1
 							tempCo_3 = tempCo_3 * temp_q_sk_multi_1
@@ -746,7 +773,8 @@ contains
 
 							call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempDepthi_1)**2.0,tempCo_1)
 
-							call calc_q_sk_multi(i-1,j,qp(i-1,repeatInterval+1,j),temp_q_sk_multi_1)
+							temp_q_sk_multi_1 = 1
+							! call calc_q_sk_multi(i-1,j,qp(i-1,repeatInterval+1,j),temp_q_sk_multi_1)
 							tempCo_1 = tempCo_1 * temp_q_sk_multi_1
 
 							call r_interpol(elevTable_1,areaTable_1,nel,tempY_1,tempArea_1)
@@ -775,7 +803,8 @@ contains
 							tempY_1 = tempDepthi_1 + z(i-1,j)
 
 							call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempDepthi_1)**2.0,tempCo_1)
-							call calc_q_sk_multi(i-1,j,qp(i-1,repeatInterval+1,j),temp_q_sk_multi_1)
+							temp_q_sk_multi_1 = 1
+							! call calc_q_sk_multi(i-1,j,qp(i-1,repeatInterval+1,j),temp_q_sk_multi_1)
 							tempCo_1 = tempCo_1 * temp_q_sk_multi_1
 
 							call r_interpol(elevTable_1,areaTable_1,nel,tempY_1,tempArea_1)
@@ -853,7 +882,9 @@ contains
 				end if      ! end of if (i .gt. 1) || end of WL calculation at j reach
 
 				! Book-keeping: Counting the number as for how many time steps the routing method is unchanged
-				routingNotChanged(i-1,j) = routingNotChanged(i-1,j) + 1
+				if (i .gt. 1) then
+					routingNotChanged(i-1,j) = routingNotChanged(i-1,j) + 1
+				end if 
 
 			end do
 
@@ -882,8 +913,9 @@ contains
     !**-----------------------------------------------------------------------------------------
     subroutine readXsection(k,lftBnkMann,rmanning_main,rgtBnkMann,leftBnkX_given,rghtBnkX_given,timesDepth,num_reach,&
                             z_ar_g, bo_ar_g, traps_ar_g, tw_ar_g, twcc_ar_g )
-        implicit none
-        save
+		
+		implicit none
+		save
 
         integer, intent(in) :: k, num_reach
         doubleprecision, intent(in) :: rmanning_main,lftBnkMann,rgtBnkMann,leftBnkX_given,rghtBnkX_given, timesDepth
@@ -911,9 +943,8 @@ contains
         allocate (compoundSKK(nel), elev(nel))
         allocate (i_start(nel), i_end(nel))
         allocate (totalNodes(3))
-
-
-        leftBnkX=leftBnkX_given
+		
+		leftBnkX=leftBnkX_given
         rghtBnkX=rghtBnkX_given
         startFound = 0
         endFound = 0
@@ -928,6 +959,7 @@ contains
         f2m=1.0
         allocate (xcs(maxTableLength), ycs(maxTableLength))
         allocate (allXcs(maxTableLength,3), allYcs(maxTableLength,3))
+		
         do i=1, maxTableLength
             !* channel x-section vertices at a given segment
             if (i==1) then
@@ -962,7 +994,7 @@ contains
         mainChanStrt=3
         mainChanEnd=6
         num=i
-
+		
         if (leftBnkX .lt. minval(xcs(2:num-1))) leftBnkX = minval(xcs(2:num-1))
         if (rghtBnkX .gt. maxval(xcs(2:num-1))) rghtBnkX = maxval(xcs(2:num-1))
 
@@ -1145,7 +1177,8 @@ contains
         end do
 
         do j = 1,nel
-            el_now=el1(j,1)
+            
+			el_now=el1(j,1)
             if (j .eq. 1) then
                 newdPdA(j) = sum(peri1(j,:)) / sum(a1(j,:))
                 newdKdA(j) = sum(conv1(j,:)) / sum(a1(j,:))     ! change Nazmul 20210601
@@ -1157,8 +1190,8 @@ contains
             compoundMann = sqrt((abs(peri1(j,1))*lftBnkMann ** 2. + abs(peri1(j,2))*rmanning_main ** 2.+&
              abs(peri1(j,3))*rgtBnkMann ** 2.) / (abs(peri1(j,1))+abs(peri1(j,2))+abs(peri1(j,3))))
             compoundSKK(j) = 1. / compoundMann
-
-            redi1All(j)=sum(a1(j,:)) /sum(peri1(j,:))
+			
+			redi1All(j)=sum(a1(j,:)) /sum(peri1(j,:))
             xsec_tab(1,j,k,num_reach) = el1(j,1)
             xsec_tab(2,j,k,num_reach) = sum(a1(j,:))
             xsec_tab(3,j,k,num_reach) = sum(peri1(j,:))
@@ -1171,8 +1204,8 @@ contains
             xsec_tab(11,j,k,num_reach) = compoundSKK(j)
         end do
         z(k,num_reach)= el_min
-
-        deallocate (el1, a1, peri1, redi1, redi1All)
+		
+		deallocate (el1, a1, peri1, redi1, redi1All)
         deallocate (conv1, tpW1, diffArea, newI1, diffPere)
         deallocate (newdPdA, diffAreaAll, diffPereAll, newdKdA)       ! change Nazmul 20210601
         deallocate (compoundSKK, elev)
@@ -1251,6 +1284,76 @@ contains
                 return
             endfunction cal_perimeter
     endsubroutine readXsection
+
+	! !*--------------------------------------------------
+    ! !*        Time Interpolation
+    ! !
+    ! !*--------------------------------------------------	
+	! double precision function r_interpol_time(x,y,jj,xt)
+
+		! integer, intent(in) :: jj
+		! real, intent(in) :: x(jj), y(jj)
+		! real, intent(in) :: xt
+		! integer :: j
+		! real :: yt
+		! !real(kind=8), intent(out) :: r_interpol_time
+
+
+		! if (xt.le.maxval(x) .and. xt.ge.minval(x)) then
+			! do j=1,jj-1
+				! if((x(j)-xt)*(x(j+1)-xt).le.0)then
+
+					! yt=(xt-x(j))/(x(j+1)-x(j))*(y(j+1)-y(j))+y(j)
+
+					! EXIT
+				! endif
+			! end do
+		! else
+			! ! print*, xt, ' is not within the limit'
+			! ! print*, 'maxval(x)= ', maxval(x), 'and minval(x)=', minval(x),'so',  xt, ' is not within the limit'
+			! ! print*, 'jj', jj
+			! ! print*, 'x', (x(i), i=1, jj)
+			! ! print*, 'y', (y(i), i=1, jj)
+			! ! stop
+			! ! !if (xt.le. minval(x)) yt=minval(y)
+			! ! !if (xt.ge. maxval(x)) yt=maxval(y)
+		! end if
+		! r_interpol_time = yt
+		! ! print*,xt
+		! return
+	! end function
+	
+	! !*--------------------------------------------------
+    ! !*        Nearest Neighbour Interpolation
+    ! !
+    ! !*--------------------------------------------------
+	! double precision function r_interpol_nn(x,y,jj,xt)
+
+		! integer, intent(in) :: jj
+		! real, intent(in) :: xt, x(jj), y(jj)
+		! integer :: j
+
+		! real :: yt
+
+		! ! nn means nearest neighbour
+
+		! if (xt.le. x(1)) then
+			! yt=y(1)
+		! elseif (xt.ge. x(jj)) then
+			! yt=y(jj)
+		! else
+			! do j=1,jj-1
+				! if((x(j)-xt)*(x(j+1)-xt).le.0)then
+
+					! yt=(xt-x(j))/(x(j+1)-x(j))*(y(j+1)-y(j))+y(j)
+
+					! EXIT
+				! endif
+			! end do
+		! end if
+		! r_interpol_nn = yt
+		! return
+	! end function
 
     !*--------------------------------------------------
     !*                 Linear Interpolation
