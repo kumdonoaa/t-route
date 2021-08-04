@@ -33,7 +33,7 @@ module arrays_module
 ! change for unsteady flow
     double precision, allocatable :: pere(:,:),dpda(:)
 
-    double precision, allocatable :: oldQ(:,:), newQ(:,:,:), oldArea(:,:), newArea(:,:) 
+    double precision, allocatable :: oldQ(:,:), newQ(:,:,:), oldArea(:,:), newArea(:,:)
 	double precision, allocatable :: oldY(:,:), newY(:,:), normalDepthAtNodes(:,:)      ! change 20210628
     double precision, allocatable :: added_Q(:,:,:)                                                                                         ! change 20210713
 
@@ -69,155 +69,118 @@ contains
 
     ! Allocate storage for all of the arrays in this module based on the number
     ! of time steps and spatial points
-    subroutine setup_arrays(num_time, num_points, maxTableEntry1, maxTableEntry2, totalLatFlow, totalQSKtable, totalChannels)
-
-        implicit none
-
-        ! Input
-        integer, intent(in) :: num_time, num_points, maxTableEntry1, maxTableEntry2, totalLatFlow, totalQSKtable, totalChannels
-
-        allocate(area(num_points))
-
-! change for unsteady flow
-
-        allocate(bo(num_points,totalChannels))
-        allocate(pere(num_points,totalChannels))
-        allocate(dpda(num_points))
-
-        !allocate(normalDepth(totalChannels))    !! this parameter indicates which channel will have full diffusive or partial diffusive routing.
-
-        allocate(normalDepthAtNodes(num_points,totalChannels))
-        normalDepthAtNodes = 0.
-
-
-        allocate(areap(num_points,totalChannels))
-        allocate(qp(num_points,num_time,totalChannels))
-
-        allocate(ini_q_repeat(num_points,totalChannels))
-        allocate(ini_E(num_points,totalChannels))
-        allocate(ini_F(num_points,totalChannels))
-
-        allocate(z(num_points,totalChannels))
-        z=0. ! initialization
-
-        allocate(av11(num_points))
-        allocate(av12(num_points))
-        allocate(av21(num_points))
-        allocate(av22(num_points))
-
-        allocate(dqp(num_points,totalChannels))
-        allocate(dqc(num_points,totalChannels))
-        allocate(dap(num_points,totalChannels))
-        allocate(dac(num_points,totalChannels))
-
-        allocate(ci1(num_points))
-        allocate(ci2(num_points))
-        allocate(aso(num_points,totalChannels))
-        aso = 0.
-        allocate(depth(num_points))
-        allocate(f1(num_points))
-        allocate(f2(num_points))
-        allocate(g11inv(num_points))
-        allocate(g12inv(num_points))
-        allocate(g21inv(num_points))
-        allocate(g22inv(num_points))
-        allocate(b11(num_points))
-        allocate(b12(num_points))
-        allocate(b21(num_points))
-        allocate(b22(num_points))
-        allocate(eps2(num_points))
-        allocate(eps4(num_points))
-        allocate(d1(num_points))
-        allocate(d2(num_points))
-        allocate(u(num_points))
-        allocate(c(num_points))
-        allocate(sk(num_points,totalChannels))
-
-        allocate(leftBank(num_points,totalChannels))
-        allocate(rightBank(num_points,totalChannels))
-        allocate(skLeft(num_points,totalChannels))
-        allocate(skMain(num_points,totalChannels))
-        allocate(skRight(num_points,totalChannels))
-
-        allocate(co(num_points))
-        allocate(gso(num_points,totalChannels))
-        gso = 0.
-        allocate(dbdx(num_points,totalChannels))
-        dbdx = 0.
-        allocate(dt(num_points))
-        allocate(ityp(num_points))
-        allocate(dx(num_points-1,totalChannels))
-        allocate(volRemain(num_points-1,totalChannels))
-
-        allocate(froud(num_points))
-
-
-        allocate(Q_sk_Table(2, maxTableEntry1, totalQSKtable,totalChannels))
-        allocate(Q_sk_tableEntry(totalQSKtable,totalChannels))
-
-
-        allocate(USBoundary(2, maxTableEntry2,totalChannels))
-        allocate(DSBoundary(2, maxTableEntry2,totalChannels))
-
-        allocate(ndep(totalChannels))
-        allocate(dslink(totalChannels))
-        !allocate(uslinks(num_points,totalChannels))
-
-        allocate(instrdflag(totalChannels,2))
-
-        allocate(courant(num_points-1))
-
-        allocate(oldQ(num_points, totalChannels))
-        allocate(newQ(num_points, num_time, totalChannels))     ! change 20210628
-
-        allocate(added_Q(num_points, num_time, totalChannels))  ! change 20210713
-
-        allocate(oldArea(num_points, totalChannels))
-        allocate(newArea(num_points, totalChannels))
-        allocate(oldY(num_points, totalChannels))
-        allocate(newY(num_points, totalChannels))
-
-        oldQ = -999; oldY = -999; newQ = -999; newY = -999
-
-        allocate(lateralFlowTable(2, maxTableEntry2, totalLatFlow, totalChannels))
-        allocate(dataInEachLatFlow(totalLatFlow, totalChannels))
-
-
-        !allocate(lateralFlow(num_points, totalChannels)) ! change 20210311
-        allocate(lateralFlow(num_points, num_time, totalChannels)) ! change 20210707
-
-
-
-        allocate(celerity(num_points, totalChannels))
-        allocate(velocity(num_points, totalChannels))
-        allocate(diffusivity(num_points, totalChannels))
-        allocate(celerity2(num_points))
-        allocate(diffusivity2(num_points))
-
-
-        allocate(eei(num_points))
-        allocate(ffi(num_points))
-        allocate(exi(num_points))
-        allocate(fxi(num_points))
-        allocate(qpx(num_points, totalChannels))
-        allocate(qcx(num_points))
-
-        allocate(dimensionless_Cr(num_points-1,totalChannels))
-        allocate(dimensionless_Fo(num_points-1,totalChannels))
-        allocate(dimensionless_Fi(num_points-1,totalChannels))
-        allocate(dimensionless_Di(num_points-1,totalChannels))
-        allocate(dimensionless_Fc(num_points-1,totalChannels))
-        allocate(dimensionless_D(num_points-1,totalChannels))
-        dimensionless_Cr = -999; dimensionless_Fo = -999; dimensionless_Fi = -999
-        dimensionless_Di = -999; dimensionless_Fc = -999; dimensionless_D = -999
-
-        allocate(lowerLimitCount(totalChannels))
-        allocate(higherLimitCount(totalChannels))
-
-
-        allocate(currentRoutingNormal(num_points-1,totalChannels))
-        allocate(routingNotChanged(num_points-1,totalChannels))
-
-    end subroutine setup_arrays
+!    subroutine setup_arrays(num_time, num_points, maxTableEntry1, maxTableEntry2, totalLatFlow, totalQSKtable, totalChannels)
+!        implicit none
+!        ! Input
+!        integer, intent(in) :: num_time, num_points, maxTableEntry1, maxTableEntry2, totalLatFlow, totalQSKtable, totalChannels
+!        allocate(area(num_points))
+!! change for unsteady flow
+!        allocate(bo(num_points,totalChannels))
+!        allocate(pere(num_points,totalChannels))
+!        allocate(dpda(num_points))
+!        !allocate(normalDepth(totalChannels))    !! this parameter indicates which channel will have full diffusive or partial diffusive routing.
+!        allocate(normalDepthAtNodes(num_points,totalChannels))
+!        normalDepthAtNodes = 0.
+!        allocate(areap(num_points,totalChannels))
+!        allocate(qp(num_points,num_time,totalChannels))
+!        allocate(ini_q_repeat(num_points,totalChannels))
+!        allocate(ini_E(num_points,totalChannels))
+!        allocate(ini_F(num_points,totalChannels))
+!        allocate(z(num_points,totalChannels))
+!        z=0. ! initialization
+!        allocate(av11(num_points))
+!        allocate(av12(num_points))
+!        allocate(av21(num_points))
+!        allocate(av22(num_points))
+!        allocate(dqp(num_points,totalChannels))
+!        allocate(dqc(num_points,totalChannels))
+!        allocate(dap(num_points,totalChannels))
+!        allocate(dac(num_points,totalChannels))
+!        allocate(ci1(num_points))
+!        allocate(ci2(num_points))
+!        allocate(aso(num_points,totalChannels))
+!        aso = 0.
+!        allocate(depth(num_points))
+!        allocate(f1(num_points))
+!        allocate(f2(num_points))
+!        allocate(g11inv(num_points))
+!        allocate(g12inv(num_points))
+!        allocate(g21inv(num_points))
+!        allocate(g22inv(num_points))
+!        allocate(b11(num_points))
+!        allocate(b12(num_points))
+!        allocate(b21(num_points))
+!        allocate(b22(num_points))
+!        allocate(eps2(num_points))
+!        allocate(eps4(num_points))
+!        allocate(d1(num_points))
+!        allocate(d2(num_points))
+!        allocate(u(num_points))
+!        allocate(c(num_points))
+!        allocate(sk(num_points,totalChannels))
+!        allocate(leftBank(num_points,totalChannels))
+!        allocate(rightBank(num_points,totalChannels))
+!        allocate(skLeft(num_points,totalChannels))
+!        allocate(skMain(num_points,totalChannels))
+!        allocate(skRight(num_points,totalChannels))
+!        allocate(co(num_points))
+!        allocate(gso(num_points,totalChannels))
+!        gso = 0.
+!        allocate(dbdx(num_points,totalChannels))
+!        dbdx = 0.
+!        allocate(dt(num_points))
+!        allocate(ityp(num_points))
+!        allocate(dx(num_points-1,totalChannels))
+!        allocate(volRemain(num_points-1,totalChannels))
+!        allocate(froud(num_points))
+!        allocate(Q_sk_Table(2, maxTableEntry1, totalQSKtable,totalChannels))
+!        allocate(Q_sk_tableEntry(totalQSKtable,totalChannels))
+!        allocate(USBoundary(2, maxTableEntry2,totalChannels))
+!        allocate(DSBoundary(2, maxTableEntry2,totalChannels))
+!        allocate(ndep(totalChannels))
+!        allocate(dslink(totalChannels))
+!        !allocate(uslinks(num_points,totalChannels))
+!        allocate(instrdflag(totalChannels,2))
+!        allocate(courant(num_points-1))
+!        allocate(oldQ(num_points, totalChannels))
+!        allocate(newQ(num_points, num_time, totalChannels))     ! change 20210628
+!        allocate(added_Q(num_points, num_time, totalChannels))  ! change 20210713
+!        allocate(oldArea(num_points, totalChannels))
+!        allocate(newArea(num_points, totalChannels))
+!        allocate(oldY(num_points, totalChannels))
+!        allocate(newY(num_points, totalChannels))
+!        oldQ = -999; oldY = -999; newQ = -999; newY = -999
+!        allocate(lateralFlowTable(2, maxTableEntry2, totalLatFlow, totalChannels))
+!        allocate(dataInEachLatFlow(totalLatFlow, totalChannels))
+!        !allocate(lateralFlow(num_points, totalChannels)) ! change 20210311
+!        allocate(lateralFlow(num_points, num_time, totalChannels)) ! change 20210707
+!        allocate(celerity(num_points, totalChannels))
+!        allocate(velocity(num_points, totalChannels))
+!        allocate(diffusivity(num_points, totalChannels))
+!        allocate(celerity2(num_points))
+!        allocate(diffusivity2(num_points))
+!
+!        allocate(eei(num_points))
+!        allocate(ffi(num_points))
+!        allocate(exi(num_points))
+!        allocate(fxi(num_points))
+!        allocate(qpx(num_points, totalChannels))
+!        allocate(qcx(num_points))
+!
+!        allocate(dimensionless_Cr(num_points-1,totalChannels))
+!        allocate(dimensionless_Fo(num_points-1,totalChannels))
+!        allocate(dimensionless_Fi(num_points-1,totalChannels))
+!        allocate(dimensionless_Di(num_points-1,totalChannels))
+!        allocate(dimensionless_Fc(num_points-1,totalChannels))
+!        allocate(dimensionless_D(num_points-1,totalChannels))
+!        dimensionless_Cr = -999; dimensionless_Fo = -999; dimensionless_Fi = -999
+!        dimensionless_Di = -999; dimensionless_Fc = -999; dimensionless_D = -999
+!
+!        allocate(lowerLimitCount(totalChannels))
+!        allocate(higherLimitCount(totalChannels))
+!        allocate(currentRoutingNormal(num_points-1,totalChannels))
+!        allocate(routingNotChanged(num_points-1,totalChannels))
+!
+!    end subroutine setup_arrays
 
 end module arrays_module

@@ -7,12 +7,14 @@ module diffusive
     !*       Water depth computation produces either normal depth or diffusive depth, the selection
     !*       of which is determined mainly by dimensionless diffusion coefficient.
     !*-------------------------------------------------------------------------------------------------
-	use constants_module
-	use arrays_module
-	use var_module
-	use arrays_section_module
-	use xsec_attribute_module
-	
+    use constants_module
+    use arrays_module
+    use matrix_module
+    use var_module
+    use arrays_section_module
+    use xsec_attribute_module
+    use subtools
+
 	implicit none
 !    !* symbolic names for kind types of 4-, 2-, and 1-byte integers:
 !    integer, parameter :: i4b = selected_int_kind(9)
@@ -55,40 +57,37 @@ module diffusive
     double precision :: z_g, bo_g, traps_g, tw_g, twcc_g, so_g, mann_g, manncc_g
     integer :: nel_g, mxncomp
     double precision :: dmyt, dmyi, dmyj
-	
+
 contains
     !*--------------------------------------------------------------------------------
     !*       Route network by using Python-to-Fortran network traversal map together
     !*          with diffusive routing engines
     !
     !*--------------------------------------------------------------------------------
-	
+
 	! TO DO:
 	! * dtini_g == saveinterval_g == saveinterval_ev_g. Remove this argument redundancy
-	
+
     subroutine diffnw(dtini_g, t0_g, tfin_g, saveinterval_g, saveinterval_ev_g, dt_ql_g, dt_ub_g, dt_db_g, &
                         nts_ql_g, nts_ub_g, nts_db_g, &
                         mxncomp_g, nrch_g, z_ar_g, bo_ar_g, traps_ar_g, tw_ar_g, twcc_ar_g, &
                         mann_ar_g, manncc_ar_g, so_ar_g, dx_ar_g, iniq, &
-                        nhincr_m_g, nhincr_f_g, ufhlt_m_g,  ufqlt_m_g, ufhlt_f_g, ufqlt_f_g, &
+                        !nhincr_m_g, nhincr_f_g, ufhlt_m_g,  ufqlt_m_g, ufhlt_f_g, ufqlt_f_g, &
                         frnw_col, dfrnw_g, qlat_g, ubcd_g, dbcd_g, &
                         cfl_g, theta_g, tzeq_flag_g, y_opt_g, so_llm_g, &
                         ntss_ev_g, q_ev_g, elv_ev_g)
-	
-		
-		use subtools
-		
+
 		implicit none
-				
+
 		integer, intent(in) :: mxncomp_g, nrch_g
         integer, intent(in) :: nts_ql_g, nts_ub_g, nts_db_g, ntss_ev_g
-        integer, intent(in) :: nhincr_m_g, nhincr_f_g, frnw_col
+        integer, intent(in) :: frnw_col !, nhincr_m_g, nhincr_f_g,
         double precision,intent(in) :: dtini_g, t0_g, tfin_g, saveinterval_g, saveinterval_ev_g, dt_ql_g, dt_ub_g, dt_db_g
 
         double precision, dimension(mxncomp_g, nrch_g), intent(in) :: z_ar_g, bo_ar_g, traps_ar_g, tw_ar_g, twcc_ar_g
         double precision, dimension(mxncomp_g, nrch_g), intent(in) :: mann_ar_g, manncc_ar_g, dx_ar_g, iniq
-        double precision, dimension(mxncomp_g, nrch_g, nhincr_m_g), intent(in) :: ufhlt_m_g,  ufqlt_m_g
-        double precision, dimension(mxncomp_g, nrch_g, nhincr_f_g), intent(in) :: ufhlt_f_g, ufqlt_f_g
+        !double precision, dimension(mxncomp_g, nrch_g, nhincr_m_g), intent(in) :: ufhlt_m_g,  ufqlt_m_g
+        !double precision, dimension(mxncomp_g, nrch_g, nhincr_f_g), intent(in) :: ufhlt_f_g, ufqlt_f_g
 
         double precision, dimension(nrch_g, frnw_col), intent(in) :: dfrnw_g !* set frnw_col=10
         double precision, dimension(nts_ql_g, mxncomp_g, nrch_g), intent(in) :: qlat_g
@@ -119,8 +118,8 @@ contains
         integer :: num_points, totalChannels
         double precision :: dmy1, dmy2
         integer :: ndata, idmy1, nts_db_g2
-        double precision :: slope, y_norm, area_n, temp
-		
+        double precision :: slope, y_norm, area_n, temp, tc_cnt
+
 		! simulation timestep
         dtini=dtini_g
         dtini_given=dtini
@@ -129,11 +128,12 @@ contains
 		! simulation final time (hrs)
         tfin=tfin_g
 		! Total number of timesteps in the simulation
-		totalTimeSteps = floor((tfin - t0)/dtini*3600)+1 
+		totalTimeSteps = floor((tfin - t0)/dtini*3600)+1
 		! repeat interval (number of timesteps)
-		repeatInterval = int(60.*60./dtini_given) ! TO DO, define in terms of a parameter
+		!repeatInterval = int(60.*60./dtini_given) ! TO DO, define in terms of a parameter
 		! number of timesteps per repeatInterval
-        ntim=repeatInterval+5 ! +1 because of boundary effects, at least 1 extra necessary
+        !ntim=repeatInterval+5 ! +1 because of boundary effects, at least 1 extra necessary
+		ntim= int(70.*60./dtini_given)+1
 		num_time=ntim
 		! number of reaches in the network
 		nlinks=nrch_g
@@ -143,7 +143,7 @@ contains
 		! maximum number of segments in a single reach
         mxncomp=mxncomp_g
 		!* water depth multiplier used in readXsection
-        timesDepth= 4.0 
+        timesDepth= 4.0
 		! number of rows in channel geometry attribute tables
         nel= 501
 		! saving interval (seconds)
@@ -154,16 +154,16 @@ contains
         num_points= mxncomp
 		! number of reaches in the network - redundant?
         totalChannels= nlinks
-		
-		
+
+
         allocate(area(num_points))
         allocate(bo(num_points,totalChannels))
         allocate(pere(num_points,totalChannels))
         allocate(areap(num_points,totalChannels))
-        allocate(qp(num_points,num_time,totalChannels))				! change Nazmul CNT	
-        allocate(ini_q_repeat(num_points,totalChannels))			! change Nazmul CNT	
-        allocate(ini_E(num_points,totalChannels))					! change Nazmul CNT	
-        allocate(ini_F(num_points,totalChannels))					! change Nazmul CNT	
+        allocate(qp(num_points,num_time,totalChannels))				! change Nazmul CNT
+        allocate(ini_q_repeat(num_points,totalChannels))			! change Nazmul CNT
+        allocate(ini_E(num_points,totalChannels))					! change Nazmul CNT
+        allocate(ini_F(num_points,totalChannels))					! change Nazmul CNT
         allocate(z(num_points,totalChannels))
         allocate(dqp(num_points,totalChannels))
         allocate(dqc(num_points,totalChannels))
@@ -244,7 +244,7 @@ contains
 		! * pass initial depth as initial conditions and dont arbitrarily intialize
 		z=z_ar_g
         ini_y=0.05  !* [meter]
-        ini_q=0.5   !*[m^3/sec]
+        ini_q=20.0 !0.5   !*[m^3/sec]
         oldQ = -999; oldY = -999; newQ = -999; newY = -999
         dimensionless_Cr = -999; dimensionless_Fo = -999; dimensionless_Fi = -999
         dimensionless_Di = -999; dimensionless_Fc = -999; dimensionless_D = -999
@@ -252,25 +252,33 @@ contains
 		! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 		! create channel geometry lookup tables
 		! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        !test
+        do j = 1,nlinks
+            ncomp= frnw_g(j,1)
+            do i=1,ncomp
+                leftBank(i,j)= (twcc_ar_g(i,j)-tw_ar_g(i,j))/2.0
+                rightBank(i,j)= (twcc_ar_g(i,j)-tw_ar_g(i,j))/2.0 + tw_ar_g(i,j)
+            enddo
+        enddo
+
 		do j = 1,nlinks
 			ncomp= frnw_g(j,1)
 			do i=1,ncomp
-			
-				leftBank(i,j)= (twcc_ar_g(i,j)-tw_ar_g(i,j))/2.0
-				rightBank(i,j)= (twcc_ar_g(i,j)-tw_ar_g(i,j))/2.0 + tw_ar_g(i,j)
+				!leftBank(i,j)= (twcc_ar_g(i,j)-tw_ar_g(i,j))/2.0
+				!rightBank(i,j)= (twcc_ar_g(i,j)-tw_ar_g(i,j))/2.0 + tw_ar_g(i,j)
 				skLeft(i,j)= 1.0/manncc_ar_g(i,j)
 				skRight(i,j)= 1.0/manncc_ar_g(i,j)
 				skMain(i,j)= 1.0/mann_ar_g(i,j)
-				
+
 				call readXsection(i,(1.0/skLeft(i,j)),(1.0/skMain(i,j)),(1.0/skRight(i,j)),&
 									leftBank(i,j), rightBank(i,j),timesDepth, j,&
 									z_ar_g, bo_ar_g, traps_ar_g, tw_ar_g, twcc_ar_g)
-									
+
 				oldY(i,j) = ini_y(j) + z(i,j)
-									
-			enddo
+                oldQ(i,j) = ini_q(j)
+            enddo
 		enddo
-		
+
         ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 		! Populate lateral inflow and upper boundary time arrays
 		! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -282,17 +290,74 @@ contains
         do n=1, nts_ub_g
             tarr_ub(n)= t0_g*60.0 + dt_ub_g*real(n-1,KIND(dt_ub_g))/60.0 !* [min]
         enddo
+        ! downstream boundary time
+        do n=1, nts_db_g
+            tarr_db(n)= t0_g*60.0 + dt_db_g*real(n-1,KIND(dt_db_g))/60.0 !* [min]
+        enddo
 
+        ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+		!  interpolation of boundaries at the initial time step
+		! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        t=t0*60.0     !! from now on, t is in minute
+        !! Need to define which channel has terminal boundary
+        ppn = 1; qqn = 1        ! ppn and qqn indicates the sequence no of the boundary data
+        do j = 1, nlinks
+            ncomp= frnw_g(j,1)
+            !* upstream boundary condition for head water reach
+!            if (instrdflag(j,1) .eq. 2) then
+!                ! interpolation of boundaries at the desired time step
+!                newQ(1,1,j)=r_interpol_time(USBoundary(1, 1:upBoundTableEntry(ppn), ppn), &
+!                    USBoundary(2, 1:upBoundTableEntry(ppn), ppn),upBoundTableEntry(ppn),t)
+!                ppn = ppn +1
+!            end if
+            if (frnw_g(j,3)==0) then !* frnw_g(j,3) indicates the number of upstream reaches.
+                do n=1,nts_ub_g
+                    varr_ub(n)= ubcd_g(n,j)
+                enddo
+                newQ(1,1,j)= intp_y(nts_ub_g, tarr_ub, varr_ub, t) !* tarr_ub in min.
+            endif
+            !* downstream boundary condition for TW reach
+!            if (instrdflag(j,2) .eq. 1) then
+!                ! interpolation of boundaries at the desired time step
+!                oldY(ncomp,j)=r_interpol_time(DSBoundary(1, 1:downBoundTableEntry(qqn), qqn), &
+!                    DSBoundary(2, 1:downBoundTableEntry(qqn), qqn),downBoundTableEntry(qqn),t)
+!                qqn = qqn +1
+!            end if
+            if (frnw_g(j,2)<0.0) then
+                !* 1. measured data
+                do n=1,nts_db_g
+                    varr_db(n)= dbcd_g(n) + z(ncomp,j) !* when dbcd is water stage, channel bottom elev is added.
+                enddo
+                oldY(ncomp,j)= intp_y(nts_db_g, tarr_db, varr_db, t)
+                ! 2. normal depth as TW boundary condition
+!                q_sk_multi=1.0
+!                slope = (z(ncomp-1,j)-z(ncomp,j))/dx(ncomp-1,j)
+!                if (slope .le. 0.0001) slope = 0.0001
+                !* oldY below takes normal depth value as a result.
+!                call normal_crit_y(ncomp, j, q_sk_multi, slope, oldQ(ncomp,j), oldY(ncomp,j), temp,  oldArea(ncomp,j), temp)
+            endif
+        end do
+        ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        ! correcting the WL initial condition based on the WL boundary
+        ! so that the initial WL is higher than or equal to the WL boundary, at j = nlinks, i=ncomp
+        ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        do j = 1,nlinks
+            ncomp= frnw_g(j,1)  !ncomp=nx1(j)
+            do i=1,ncomp
+                !oldY(i,j) = max(oldY(i,j),oldY(nx1(nlinks),nlinks))     ! corrected 20210524
+                oldY(i,j) = max(oldY(i,j),oldY(frnw_g(nlinks,1),nlinks))     ! corrected 20210524
+            end do
+        end do
         ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 		! Define initial parameters for Diffusive Wave
 		! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         theta = 1.0
         qpx = 0.
         cfl=0.9
-        width = 100. !   initialization
-        celerity = 1.0
+        width = 10. !   initialization
+        celerity = -999.
         maxCelerity = 1.0
-        diffusivity = 10.
+        diffusivity = -999.
         maxCelDx = maxCelerity / minDx
         !!! setting initial values of dimensionless parameters
         !dimensionless_Cr, dimensionless_Fo, dimensionless_Fi, dimensionless_Fc, dimensionless_Di, dimensionless_D
@@ -304,13 +369,15 @@ contains
         currentRoutingNormal = 0
         routingNotChanged = 0
 		min_Q = 0.028316    ! 1 cfs = 0.028316 m3/s
-		
+
 		ini_E = 1.0
 		ini_F = 0.0
-		
 		! Define initial discharge conditons
-		ini_q_repeat = iniq
-
+		!ini_q_repeat = iniq
+        do j = 1, nlinks
+            ncomp = frnw_g(j,1) !nx1(j)
+            ini_q_repeat(1:ncomp,j) = ini_q(j)
+        end do
 		! initialization of Q, celerity, and diffusivity
 		celerity = 1.0
 		diffusivity = 100.0
@@ -320,76 +387,81 @@ contains
 				newQ(i,1,j) = iniq(i,j)
 			end do
 		end do
-		
-		do kkk = 1,totalTimeSteps-1, repeatInterval
 
+        repeatInterval = int(60.*60./dtini_given)
+
+		do kkk = 1,totalTimeSteps-1, repeatInterval
 			! first time of kkk-th repeatInterval (minutes)
 			ini_time = real(kkk-1)*dtini/60.+t0*60.
-			
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-			! FLOW CALCULATION
+			!    Discharge computation using CNT method
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 			do j = 1, nlinks
-
 				ncomp = frnw_g(j,1)
 
-				do timestep=1, ntim
-				
+                do timestep=1, ntim
 					! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-					! applying the upstream boundary conditions in the matrix newQ
+					! applying the upstream/junction boundary conditions in the matrix newQ
 					! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-					
-					if (frnw_g(j,3) == 0) then ! reach is a headwater - use upstream boundary condition data
-						varr_ub = ubcd_g(:,j)
-						! interpolate upper boundary data to simulation time interval
-						newQ(1,timestep,j)= intp_y(nts_ub_g, tarr_ub, varr_ub, ini_time+dtini/60.*(timestep-1)) !* tarr_ub in min.
-					end if
-					
+!					if (frnw_g(j,3) == 0) then ! reach is a headwater - use upstream boundary condition data
+!						varr_ub = ubcd_g(:,j)
+!						! interpolate upper boundary data to simulation time interval
+!						newQ(1,timestep,j)= intp_y(nts_ub_g, tarr_ub, varr_ub, ini_time+dtini/60.*(timestep-1)) !* tarr_ub in min.
+!					end if
+                    !* head water reach
+                    if (frnw_g(j,3)==0) then
+                        do n=1,nts_ub_g
+                            varr_ub(n)= ubcd_g(n,j)
+                        enddo
+                        tc_cnt= ini_time+dtini/60.*real(timestep-1)
+                        newQ(1, timestep, j)= intp_y(nts_ub_g, tarr_ub, varr_ub, tc_cnt) !* tarr_ub in min.
+                    end if
+					!* junction boundary
 					if (frnw_g(j,3).gt.0) then  ! reach boundary originates from a junction
-					
 						newQ(1,timestep,j) = 0.
 						do k=1, frnw_g(j,3)
-						
 							linknb= frnw_g(j,3+k)
 							nodenb= frnw_g(linknb,1)
-							
 							! sum of junction inflows
 							newQ(1,timestep,j) = newQ(1,timestep,j) + newQ(nodenb,timestep,linknb)
-		
 						end do
-
 					end if
-				  
 					! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 					! populate lateral inflow array
 					! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-					
 					lateralFlow(:,:,j) = 0
-					do i=1,ncomp-1
-						do n=1,nts_ql_g
-							varr_ql(n)= qlat_g(n,i,j)
-						enddo
-						lateralFlow(i,timestep,j)= intp_y(nts_ql_g, tarr_ql, varr_ql, ini_time+dtini/60.*(timestep-1)) ! tarr_ql in minutes
-						
-					end do
-					
-				end do
-
+!					do i=1,ncomp-1
+!						do n=1,nts_ql_g
+!							varr_ql(n)= qlat_g(n,i,j)
+!						enddo
+!						lateralFlow(i,timestep,j)= intp_y(nts_ql_g, tarr_ql, varr_ql, ini_time+dtini/60.*(timestep-1)) ! tarr_ql in minutes
+!					end do
+                    do i=1,ncomp-1
+				    	do n=1,nts_ql_g
+				    	    varr_ql(n)= qlat_g(n,i,j) !* qlat_g(n,i,j) in unit of m2/sec
+				    	enddo
+				    	tc_cnt= ini_time+dtini/60.*real(timestep-1)
+                        lateralFlow(i, timestep, j)= intp_y(nts_ql_g, tarr_ql, varr_ql, tc_cnt)
+                    enddo
+         			!* head water reach
+                    if (frnw_g(j,3)==0) then
+                        newQ(1,timestep,j) = newQ(1,timestep,j)+lateralFlow(1,timestep,j)*dx(1,j)
+                        lateralFlow(1,timestep,j) = 0.0       ! lateral flow at i = 1 is already added to the u/s
+                    endif
+				enddo !* do timestep=1, ntim
 				! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 				! Diffusive wave forward sweep to calculate flow at t+1
 				! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-					
 				qp(:,:,j) = newQ(:,:,j)
+
 				call diffusive_CNT(j,ntim,repeatInterval)
 
 				newQ(:,:,j) = qp(:,:,j)
-
-			end do
+			enddo  !* j = 1, nlinks
 
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 			! Write flow results to q_ev_g array
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-			
 			do timestep = 1,repeatInterval,saveFrequency
 				ts_ev = ((ini_time*60.0)/dtini) + (timestep)
 				do j=1,nlinks
@@ -399,39 +471,38 @@ contains
 					end do
 				end do
 			end do
-			
+
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 			! DEPTH, CELERITY, and DIFFUSIVITY CALCULATION
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 			added_Q = 0.
-
 			do j=nlinks,1,-1
-
 				ncomp = frnw_g(j,1)
-				
 				! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-				! applying the downstream boundary conditons in matrix newY
+				! applying the downstream boundary conditions in matrix newY
 				! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 				if (frnw_g(j,2) < 0.0) then    ! use normal depth water depth calculation
-				
-					q_sk_multi=1.0
-					slope = (z(ncomp-1,j)-z(ncomp,j))/dx(ncomp-1,j)
-					if (slope .le. 0.0001) slope = 0.0001
-
-					! calculate normal depth 
-					call normal_crit_y(ncomp, j, q_sk_multi, slope, newQ(ncomp,repeatInterval,j), oldY(ncomp,j), temp,  temp, temp)
-					
-					
+                    !* TW reach
+                    !* 1. measured data at TW
+                    do n=1,nts_db_g
+                        varr_db(n)= dbcd_g(n) + z(ncomp,j) !* when dbcd is water stage, channel bottom elev is added.
+                    enddo
+                    tc_cnt= ini_time+dtini/60.*real(repeatInterval)
+                    newY(ncomp,j)= intp_y(nts_db_g, tarr_db, varr_db, tc_cnt)
+                   ! 2. normal depth as TW boundary condition
+                    !q_sk_multi=1.0
+                    !slope = (z(ncomp-1,j)-z(ncomp,j))/dx(ncomp-1,j)
+                    !if (slope .le. 0.0001) slope = 0.0001
+                    !call normal_crit_y(ncomp, j, q_sk_multi, slope, newQ(ncomp,j), newY(ncomp,j), temp, newArea(ncomp,j), temp)
 				elseif (frnw_g(j,2) .ge. 0.0) then    ! water level is calculated from the downstream river reach
+					!* Not TW reach
 					linknb=frnw_g(j,2) ! reach downstream of j
 					newY(ncomp,j)= newY(1,linknb)   ! taking the WL from the d/s reach
 				end if
 
 				call mesh_diffusive_backward(j,ntim,repeatInterval)
-				
+
 			end do
-			
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 			! Write depth results to q_ev_g array
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -444,71 +515,67 @@ contains
 					end do
 				end do
 			end do
+            !* test
+            do j=1,nlinks
+                ncomp = frnw_g(j,1)
+                write(8, 10) ini_time+real(repeatInterval)*dtini/60.,j, (newY(i,j), i=1, ncomp)
+                write(95, 10) ini_time+real(repeatInterval)*dtini/60.,j, (celerity(i,j), i=1, ncomp)
+                write(96, 10) ini_time+real(repeatInterval)*dtini/60.,j, (diffusivity(i,j), i=1, ncomp)
+                write(991, 10) ini_time+real(repeatInterval)*dtini/60.,j, (newY(i,j)-z(i,j), i=1, ncomp)
+                write(993, 10) ini_time+real(repeatInterval)*dtini/60.,j, (velocity(i,j), i=1, ncomp)
+                courant= -999.
+                do i=1,ncomp-1
+                    courant(i) = celerity(i,j) * dtini / dx(i,j)
+                end do
+                 write(9921, 10) ini_time+real(repeatInterval)*dtini/60.,j, (courant(i), i=1, ncomp)
+            end do
 
 			oldY = newY
 
 		end do ! end kkk loop
-	
-	print *, 'completed diffusive network simulation'
-	
-	deallocate(frnw_g)
-	deallocate(area, bo, pere, areap, qp, z, dqp, dqc, dap, dac, depth, sk, co, dx)
-	deallocate(volRemain, froud, courant, oldQ, newQ, oldArea, newArea, oldY, newY)
-	deallocate(lateralFlow, celerity, diffusivity, celerity2, diffusivity2)
-	deallocate(eei, ffi, exi, fxi, qpx, qcx)
-	deallocate(dimensionless_Cr, dimensionless_Fo, dimensionless_Fi)
-	deallocate(dimensionless_Di, dimensionless_Fc, dimensionless_D)
-	deallocate(lowerLimitCount, higherLimitCount, currentRoutingNormal, routingNotChanged)
-	deallocate(elevTable, areaTable, pereTable, rediTable, convTable, topwTable)
-	deallocate( skkkTable, nwi1Table, dPdATable, ncompElevTable, ncompAreaTable)
-	deallocate(xsec_tab, rightBank, leftBank, skLeft, skMain, skRight)
-	deallocate(currentSquareDepth, ini_y, ini_q, notSwitchRouting, currentROutingDiffusive )
-	deallocate(tarr_ql, varr_ql, tarr_ub, varr_ub)	
-	deallocate(ini_q_repeat, ini_E, ini_F, added_Q, velocity)
+
+        print *, 'completed diffusive network simulation'
+        10  format(f12.5 ,i6, 2200f14.4)
+        11  format(f12.5 ,i6, 2200i6)
+
+        deallocate(frnw_g)
+        deallocate(area, bo, pere, areap, qp, z, dqp, dqc, dap, dac, depth, sk, co, dx)
+        deallocate(volRemain, froud, courant, oldQ, newQ, oldArea, newArea, oldY, newY)
+        deallocate(lateralFlow, celerity, diffusivity, celerity2, diffusivity2)
+        deallocate(eei, ffi, exi, fxi, qpx, qcx)
+        deallocate(dimensionless_Cr, dimensionless_Fo, dimensionless_Fi)
+        deallocate(dimensionless_Di, dimensionless_Fc, dimensionless_D)
+        deallocate(lowerLimitCount, higherLimitCount, currentRoutingNormal, routingNotChanged)
+        deallocate(elevTable, areaTable, pereTable, rediTable, convTable, topwTable)
+        deallocate( skkkTable, nwi1Table, dPdATable, ncompElevTable, ncompAreaTable)
+        deallocate(xsec_tab, rightBank, leftBank, skLeft, skMain, skRight)
+        deallocate(currentSquareDepth, ini_y, ini_q, notSwitchRouting, currentROutingDiffusive )
+        deallocate(tarr_ql, varr_ql, tarr_ub, varr_ub)
+        deallocate(ini_q_repeat, ini_E, ini_F, added_Q, velocity)
 
 	end subroutine diffnw
-	
-! ###########################################################################################
-! ###########################################################################################
-! ###########################################################################################
 
+! ###########################################################################################
+! ###########################################################################################
+! ###########################################################################################
+!     Compute discharge using CNT method, "Algorithms for solving the diffusive wave flood
+!       routing equation" by R. Moussa et al.
 	subroutine diffusive_CNT(j,ntim,repeatInterval)
-
-		use constants_module
-		use arrays_module 
-		use matrix_module 
-		use var_module	  
-		use arrays_section_module 
-		use xsec_attribute_module 
-		use subtools
-
 		implicit none
-
 		integer, intent(in) :: j, ntim, repeatInterval
-
 		double precision,allocatable :: E_cnt(:,:), F_cnt(:,:)
-
 		integer :: i, n, kk
-
 		double precision :: hi, gi, ki, pj, qj, rj, pj_p, qj_p, rj_p, sj_p, mi, ni, qp_ghost, qp_ghost_1
 
-
-	!!++++++++++++++++++++ Diffusive wave Forward sweep starts +++++++++++++++++++!!
-
 		ncomp = frnw_g(j,1)
-
 		allocate(E_cnt(ncomp,ntim))
 		allocate(F_cnt(ncomp,ntim))
-
 		qp_ghost_1 = qp(1,ntim,j)
-
 		E_cnt(1:ncomp,1) = ini_E(1:ncomp,j)
 		F_cnt(1:ncomp,1) = ini_F(1:ncomp,j)
 
 		do i = 2,ncomp
-
 			do n = 2, ntim
-
 				hi = dx(i-1,j) / (dtini * celerity(i-1,j))
 				gi = diffusivity(i-1,j) * dx(i-1,j) / ((celerity(i-1,j)**3.0)*(dtini**2.0))
 				ki = (gi ** 2.0)/(hi ** 2.0)
@@ -536,27 +603,21 @@ contains
 
 				E_cnt(i,n) = -1.0 * rj / (pj * E_cnt(i,n-1) + qj)
 				F_cnt(i,n) = ( sj_p - pj * F_cnt(i,n-1) ) / ( pj * E_cnt(i,n-1) + qj )
-
 			end do
 
 			qp_ghost = qp(i-1,ntim,j)+lateralFlow(i-1,ntim,j)*dx(i-1,j)
-
 			qp_ghost_1 = qp_ghost
-
 			! boundary at t=ntim, calculated from the ghost node at t=ntim+1
 			qp(i,ntim,j) = E_cnt(i,ntim) * qp_ghost + F_cnt(i,ntim)
 
 			do n = ntim-1,1,-1
 				qp(i,n,j) = E_cnt(i,n) * qp(i,n+1,j) + F_cnt(i,n)
-
 				if (qp(i,n,j) .lt. min_Q) then
 					added_Q(i,n,j) = min_Q - qp(i,n,j)
 					qp(i,n,j) = max(qp(i,n,j),min_Q)
 				end if
-
-			end do
-
-		end do
+			enddo
+		enddo  !* do i = 2,ncomp
 
 		! replacing with the initial value at all nodes
 		qp(1:ncomp,1,j) = ini_q_repeat(1:ncomp,j)
@@ -569,36 +630,19 @@ contains
 		deallocate (E_cnt, F_cnt)
 
 	end subroutine diffusive_CNT
-
 ! ###########################################################################################
 ! ###########################################################################################
 ! ###########################################################################################
-
+!   Compute water elevation, celerity and diffusivity
 	subroutine mesh_diffusive_backward(j,ntim,repeatInterval)
-
-		use constants_module
-		use arrays_module
-		use matrix_module
-		use var_module
-		use arrays_section_module
-		use xsec_attribute_module
-		use subtools
-
-		implicit none
-
+        implicit none
 		integer, intent(in) :: j,ntim,repeatInterval
-
 		double precision :: a1, a2, a3, a4, b1, b2, b3, b4, dd1, dd2, dd3, dd4, h1, h2, h3, h4, xt
 		double precision :: qy, qxy, qxxy, qxxxy, ppi, qqi, rri, ssi, sxi, mannings, Sb, width, slope
-
 		double precision :: cour, cour2, q_sk_multi, sfi, temp, dkdh
 		double precision :: D_lim1, D_lim2, y_norm, y_crit, area_n, area_c, chnWidth, vel,y_norm1
-		
-		! double precision :: r_interpol_nn, r_interpol_time
-
 		double precision :: y_norm_ds, y_crit_ds, S_ncomp, frds, area_0, width_0, hydR_0, errorY, currentQ, stg1, stg2
 		integer :: tableLength, jj, iii
-
 		double precision :: elevTable_1(nel),areaTable_1(nel),rediTable_1(nel)
 		double precision ::convTable_1(nel),topwTable_1(nel),currentSquaredDepth_1(nel)
 		double precision :: dKdATable_1(nel)
@@ -609,302 +653,251 @@ contains
 		double precision :: tempdKdA_1, tempY_2, tempY_3, temp_v_1, tempDepthi_2
 		double precision :: skkkTable_1(nel), tempsk_1
 		double precision :: usFroud, dsFroud, dUdt, eHds, y_alt, area_alt, y_cnj, area_cnj, y_crit_test, y_norm_test
-		integer :: depthCalOk(ncomp), wlCalcMethod
-
+		integer :: depthCalOk(mxncomp), wlCalcMethod
 		integer :: i, pp
-		
 		double precision :: unity
-		unity = 1.0		
+		unity = 1.0
+        D_lim1 = -10.
+        D_lim2 = -15.
+        ! wlCalcMethod = 1 : Mid-point bisection method
+        ! wlCalcMethod = 2 : simple iterative method method with contribution from dU/dX
+        ! wlCalcMethod = 3 : Newton Raphson method
+        ! wlCalcMethod = 6 : Only Normal depth
+        wlCalcMethod = 3
+        depthCalOk(ncomp) = 1
+        q_sk_multi = 1
 
-	!!++++++++++++++++++++ Diffusive wave Backward sweep starts +++++++++++++++++++!!
+        ncomp = frnw_g(j,1)
+        do i=ncomp,1,-1
+            currentQ = qp(i,repeatInterval+1,j)
+            ! call calc_q_sk_multi(i,j,currentQ,q_sk_multi)
+            ! Calculating : read all attributes from tab file
+            elevTable = xsec_tab(1,:,i,j)
+            convTable = xsec_tab(5,:,i,j)
+            areaTable = xsec_tab(2,:,i,j)
+            pereTable = xsec_tab(3,:,i,j)
+            topwTable = xsec_tab(6,:,i,j)
+            skkkTable = xsec_tab(11,:,i,j)
+            ! interpolate the cross section attributes based on water elevation
+            xt=newY(i,j)
 
-			D_lim1 = -10.
-			D_lim2 = -15.
-			wlCalcMethod = 3
+            currentSquareDepth=(elevTable-z(i,j))**2.
 
-			! wlCalcMethod = 1 : Mid-point bisection method
-			! wlCalcMethod = 2 : simple iterative method method with contribution from dU/dX
-			! wlCalcMethod = 3 : Newton Raphson method
-			! wlCalcMethod = 6 : Only Normal depth
+            call r_interpol(currentSquareDepth,convTable,nel,(newY(i,j)-z(i,j))**2.0,co(i))
+            if (co(i) .eq. -9999) then
+                print*, 'At j = ',j,', i = ',i, 'interpolation of conveyence was not possible, wl', &
+                newY(i,j), 'z',z(i,j),'previous wl',newY(i+1,j), 'previous z',z(i+1,j)
+                stop
+            end if
+            co(i) =q_sk_multi * co(i)
 
-			ncomp = frnw_g(j,1)
+            call r_interpol(elevTable,areaTable,nel,xt,newArea(i,j))
+            if (newArea(i,j) .eq. -9999) then
+                print*, 'At j = ',j,', i = ',i, 'interpolation of newArea was not possible'
+                stop
+            end if
+            call r_interpol(elevTable,pereTable,nel,xt,pere(i,j))
+            call r_interpol(elevTable,topwTable,nel,xt,bo(i,j))
+            call r_interpol(elevTable,skkkTable,nel,xt,sk(i,j))
 
-			depthCalOk(ncomp) = 1
-			q_sk_multi = 1
+            sfi = qp(i,repeatInterval+1,j) * abs(qp(i,repeatInterval+1,j)) / ( co(i)** 2.0 )
+            if (abs(qp(i,repeatInterval+1,j)) .lt. min_Q) then
+                sfi = min_Q ** 2.0 * dsign(unity,qp(i,repeatInterval+1,j)) / ( co(i)** 2.0 )
+                ! at some head water basin, the Q boundary becomes 0.0 m3/s at some time. If Q = 0, then
+                ! sfi = 0. This leads to diffusivity = NaN. To avoid NaN diffusivity, those sfi is calculated using the min_Q
+                ! for those cases.
+            end if
 
-			do i=ncomp,1,-1
+            chnWidth = rightBank(i,j)-leftBank(i,j)
+            chnWidth = min(chnWidth,bo(i,j))
 
-				currentQ = qp(i,repeatInterval+1,j)
-				! call calc_q_sk_multi(i,j,currentQ,q_sk_multi)
-
-				! Calculating : read all attributes from tab file
-				elevTable = xsec_tab(1,:,i,j)
-				convTable = xsec_tab(5,:,i,j)
-				areaTable = xsec_tab(2,:,i,j)
-				pereTable = xsec_tab(3,:,i,j)
-				topwTable = xsec_tab(6,:,i,j)
-				skkkTable = xsec_tab(11,:,i,j)
-				
-				! interpolate the cross section attributes based on water elevation
-				xt=newY(i,j)
-
-				currentSquareDepth=(elevTable-z(i,j))**2.
-
-				call r_interpol(currentSquareDepth,convTable,nel,(newY(i,j)-z(i,j))**2.0,co(i))
-				if (co(i) .eq. -9999) then
-					print*, 'At j = ',j,', i = ',i, 'interpolation of conveyence was not possible, wl', &
-					newY(i,j), 'z',z(i,j),'previous wl',newY(i+1,j), 'previous z',z(i+1,j)
-					stop
-				end if
-				co(i) =q_sk_multi * co(i)
-
-				call r_interpol(elevTable,areaTable,nel,xt,newArea(i,j))
-				if (newArea(i,j) .eq. -9999) then
-					print*, 'At j = ',j,', i = ',i, 'interpolation of newArea was not possible'
-					stop
-				end if
-				call r_interpol(elevTable,pereTable,nel,xt,pere(i,j))
-				call r_interpol(elevTable,topwTable,nel,xt,bo(i,j))
-				call r_interpol(elevTable,skkkTable,nel,xt,sk(i,j))
-
-				sfi = qp(i,repeatInterval+1,j) * abs(qp(i,repeatInterval+1,j)) / ( co(i)** 2.0 )
-				if (abs(qp(i,repeatInterval+1,j)) .lt. min_Q) then
-					sfi = min_Q ** 2.0 * dsign(unity,qp(i,repeatInterval+1,j)) / ( co(i)** 2.0 )
-					! at some head water basin, the Q boundary becomes 0.0 m3/s at some time. If Q = 0, then
-					! sfi = 0. This leads to diffusivity = NaN. To avoid NaN diffusivity, those sfi is calculated using the min_Q
-					! for those cases.
-				end if
-
-				chnWidth = rightBank(i,j)-leftBank(i,j)
-				chnWidth = min(chnWidth,bo(i,j))
-
-				if (depthCalOk(i) .eq. 1) then
-					celerity2(i)=5.0 / 3.0 * abs(sfi) ** 0.3 * abs(qp(i,repeatInterval+1,j)) ** &
+            if (depthCalOk(i) .eq. 1) then
+                celerity2(i)=5.0 / 3.0 * abs(sfi) ** 0.3 * abs(qp(i,repeatInterval+1,j)) ** &
 						0.4 / bo(i,j) ** 0.4 / (1./(sk(i,j)*q_sk_multi)) ** 0.6
-					diffusivity2(i) = abs(qp(i,repeatInterval+1,j)) / 2.0 / bo(i,j) / abs(sfi)
-					vel = qp(i,repeatInterval+1,j)/newArea(i,j)
-
-					velocity(i,j) = vel
-
-					! Applying the upper limit of celerity
-					if (celerity2(i) .gt. 3.0*vel) celerity2(i) = vel*3.0
-				else
-					if (qp(i,repeatInterval+1,j) .lt. 1) then
-						celerity2(i)=0.5
-					else
-						celerity2(i)=1.0
-					end if
-
+                diffusivity2(i) = abs(qp(i,repeatInterval+1,j)) / 2.0 / bo(i,j) / abs(sfi)
+                vel = qp(i,repeatInterval+1,j)/newArea(i,j)
+                velocity(i,j) = vel
+                ! Applying the upper limit of celerity
+                if (celerity2(i) .gt. 3.0*vel) celerity2(i) = vel*3.0
+            else
+                if (qp(i,repeatInterval+1,j) .lt. 1) then
+                    celerity2(i)=0.5
+                else
+                    celerity2(i)=1.0
+                endif
 					diffusivity2(i)=diffusivity(i,j)
-				end if
+            endif
+            ! Calculating Depth at the upstream node
+            if (i .gt. 1) then
+                slope = (z(i-1,j)-z(i,j))/dx(i-1,j)
+                depthYi = newY(i,j) - z(i,j)
+                tempDepthi_1 = oldY(i-1,j)-z(i-1,j)
 
-				! Calculating Depth at the upstream node
-				if (i .gt. 1) then
+                elevTable_1 = xsec_tab(1,:,i-1,j)
+                areaTable_1 = xsec_tab(2,:,i-1,j)
+                pereTable_1 = xsec_tab(3,:,i-1,j)
+                rediTable_1 = xsec_tab(4,:,i-1,j)
+                convTable_1 = xsec_tab(5,:,i-1,j)
+                topwTable_1 = xsec_tab(6,:,i-1,j)
+                dKdATable_1 = xsec_tab(9,:,i-1,j)
 
-					slope = (z(i-1,j)-z(i,j))/dx(i-1,j)
-					depthYi = newY(i,j) - z(i,j)
+                currentSquaredDepth_1=(elevTable_1-z(i-1,j))**2.
 
-					tempDepthi_1 = oldY(i-1,j)-z(i-1,j)
+                toll = 1.0
+                iii = 0
+                dsFroud = abs(qp(i,repeatInterval+1,j))/sqrt(grav*newArea(i,j)**3.0/bo(i,j))
+                !** Applying mid point bisection
+                if (wlCalcMethod .eq. 1) then
+                    tempY_1 = elevTable_1(2)
+                    tempY_2 = depthYi * 3. + z(i-1,j)
+                    tempY_3 = (tempY_1 + tempY_2) / 2.
+                    do while ( abs(toll) .gt. 0.001)
+                        iii = iii +1
+                        call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempY_1-z(i-1,j))**2.0,tempCo_1)
+                        call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempY_2-z(i-1,j))**2.0,tempCo_2)
+                        call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempY_3-z(i-1,j))**2.0,tempCo_3)
 
-					elevTable_1 = xsec_tab(1,:,i-1,j)
-					areaTable_1 = xsec_tab(2,:,i-1,j)
-					pereTable_1 = xsec_tab(3,:,i-1,j)
-					rediTable_1 = xsec_tab(4,:,i-1,j)
-					convTable_1 = xsec_tab(5,:,i-1,j)
-					topwTable_1 = xsec_tab(6,:,i-1,j)
-					dKdATable_1 = xsec_tab(9,:,i-1,j)
+                        temp_q_sk_multi_1 = 1
+                        ! call calc_q_sk_multi(i-1,j,qp(i-1,repeatInterval+1,j),temp_q_sk_multi_1)
+                        tempCo_1 = tempCo_1 * temp_q_sk_multi_1
+                        tempCo_2 = tempCo_2 * temp_q_sk_multi_1
+                        tempCo_3 = tempCo_3 * temp_q_sk_multi_1
 
-					currentSquaredDepth_1=(elevTable_1-z(i-1,j))**2.
+                        tempsfi_1 = qp(i-1,repeatInterval+1,j) * abs(qp(i-1,repeatInterval+1,j)) / ( tempCo_1** 2.0 )
+                        tempsfi_2 = qp(i-1,repeatInterval+1,j) * abs(qp(i-1,repeatInterval+1,j)) / ( tempCo_2** 2.0 )
+                        tempsfi_3 = qp(i-1,repeatInterval+1,j) * abs(qp(i-1,repeatInterval+1,j)) / ( tempCo_3** 2.0 )
 
-					toll = 1.0
-					iii = 0
+                        ffy_1 = (tempY_1-z(i-1,j)) - depthYi + dx(i-1,j)*slope - 0.5*dx(i-1,j)*(sfi + tempsfi_1)
+                        ffy_2 = (tempY_2-z(i-1,j)) - depthYi + dx(i-1,j)*slope - 0.5*dx(i-1,j)*(sfi + tempsfi_2)
+                        ffy_3 = (tempY_3-z(i-1,j)) - depthYi + dx(i-1,j)*slope - 0.5*dx(i-1,j)*(sfi + tempsfi_3)
 
-					dsFroud = abs(qp(i,repeatInterval+1,j))/sqrt(grav*newArea(i,j)**3.0/bo(i,j))
+                        if ((ffy_1 * ffy_2) .gt. 0.) then
+                            tempY_2 = (tempY_2 - z(i-1,j)) * 2.0 + z(i-1,j)
+                        elseif ((ffy_1 * ffy_3) .le. 0.) then
+                            tempY_2 = tempY_3
+                        elseif ((ffy_2 * ffy_3) .le. 0.) then
+                            tempY_1 = tempY_3
+                        end if
+                        tempY_3 = (tempY_1 + tempY_2) / 2.0
+                        toll = tempY_2 - tempY_1
+                        tempDepthi_1 = tempY_3 - z(i-1,j)
+                        depthCalOk(i-1) = 1
+                    enddo
+                endif
+                !** Applying simple iteration method with inclusion of dU/dX
+                if (wlCalcMethod .eq. 2) then
+                    vel = qp(i,repeatInterval+1,j)/newArea(i,j)
+                    toll = 1.0
+                    do while ( abs(toll) .gt. 0.001)
+                        iii = iii +1
+                        tempY_1 = tempDepthi_1 + z(i-1,j)
 
-					! Applying mid point bisection
-					if (wlCalcMethod .eq. 1) then
-						tempY_1 = elevTable_1(2)
-						tempY_2 = depthYi * 3. + z(i-1,j)
-						tempY_3 = (tempY_1 + tempY_2) / 2.
-						do while ( abs(toll) .gt. 0.001)
-							iii = iii +1
+                        call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempDepthi_1)**2.0,tempCo_1)
 
-							call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempY_1-z(i-1,j))**2.0,tempCo_1)
-							call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempY_2-z(i-1,j))**2.0,tempCo_2)
-							call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempY_3-z(i-1,j))**2.0,tempCo_3)
+                        temp_q_sk_multi_1 = 1
+                        ! call calc_q_sk_multi(i-1,j,qp(i-1,repeatInterval+1,j),temp_q_sk_multi_1)
+                        tempCo_1 = tempCo_1 * temp_q_sk_multi_1
 
-							temp_q_sk_multi_1 = 1
-							! call calc_q_sk_multi(i-1,j,qp(i-1,repeatInterval+1,j),temp_q_sk_multi_1)
-							tempCo_1 = tempCo_1 * temp_q_sk_multi_1
-							tempCo_2 = tempCo_2 * temp_q_sk_multi_1
-							tempCo_3 = tempCo_3 * temp_q_sk_multi_1
+                        call r_interpol(elevTable_1,areaTable_1,nel,tempY_1,tempArea_1)
 
-							tempsfi_1 = qp(i-1,repeatInterval+1,j) * abs(qp(i-1,repeatInterval+1,j)) / ( tempCo_1** 2.0 )
-							tempsfi_2 = qp(i-1,repeatInterval+1,j) * abs(qp(i-1,repeatInterval+1,j)) / ( tempCo_2** 2.0 )
-							tempsfi_3 = qp(i-1,repeatInterval+1,j) * abs(qp(i-1,repeatInterval+1,j)) / ( tempCo_3** 2.0 )
-
-							ffy_1 = (tempY_1-z(i-1,j)) - depthYi + dx(i-1,j)*slope - 0.5*dx(i-1,j)*(sfi + tempsfi_1)
-							ffy_2 = (tempY_2-z(i-1,j)) - depthYi + dx(i-1,j)*slope - 0.5*dx(i-1,j)*(sfi + tempsfi_2)
-							ffy_3 = (tempY_3-z(i-1,j)) - depthYi + dx(i-1,j)*slope - 0.5*dx(i-1,j)*(sfi + tempsfi_3)
-
-							if ((ffy_1 * ffy_2) .gt. 0.) then
-								tempY_2 = (tempY_2 - z(i-1,j)) * 2.0 + z(i-1,j)
-							elseif ((ffy_1 * ffy_3) .le. 0.) then
-								tempY_2 = tempY_3
-							elseif ((ffy_2 * ffy_3) .le. 0.) then
-								tempY_1 = tempY_3
-							end if
-							tempY_3 = (tempY_1 + tempY_2) / 2.0
-							toll = tempY_2 - tempY_1
-							tempDepthi_1 = tempY_3 - z(i-1,j)
-							depthCalOk(i-1) = 1
-
-						end do
-					end if
-
-					! Applying simple iteration method with inclusion of dU/dX
-					if (wlCalcMethod .eq. 2) then
-						vel = qp(i,repeatInterval+1,j)/newArea(i,j)
-						toll = 1.0
-
-						do while ( abs(toll) .gt. 0.001)
-							iii = iii +1
-							tempY_1 = tempDepthi_1 + z(i-1,j)
-
-							call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempDepthi_1)**2.0,tempCo_1)
-
-							temp_q_sk_multi_1 = 1
-							! call calc_q_sk_multi(i-1,j,qp(i-1,repeatInterval+1,j),temp_q_sk_multi_1)
-							tempCo_1 = tempCo_1 * temp_q_sk_multi_1
-
-							call r_interpol(elevTable_1,areaTable_1,nel,tempY_1,tempArea_1)
-
-							temp_v_1 = qp(i-1,repeatInterval+1,j) / tempArea_1
-
-							tempsfi_1 = qp(i-1,repeatInterval+1,j) * abs(qp(i-1,repeatInterval+1,j)) / ( tempCo_1** 2.0 )!
-
-							tempDepthi_2 = depthYi - dx(i-1,j)*slope + 0.5*dx(i-1,j)*(sfi + tempsfi_1)&
+                        temp_v_1 = qp(i-1,repeatInterval+1,j) / tempArea_1
+                        tempsfi_1 = qp(i-1,repeatInterval+1,j) * abs(qp(i-1,repeatInterval+1,j)) / ( tempCo_1** 2.0 )!
+                        tempDepthi_2 = depthYi - dx(i-1,j)*slope + 0.5*dx(i-1,j)*(sfi + tempsfi_1)&
 								+0.5*(vel+temp_v_1)*(vel-temp_v_1)/grav
+                        toll = tempDepthi_2 - tempDepthi_1
+                        tempDepthi_1 = tempDepthi_2
+                    end do
+                    depthCalOk(i-1) = 1
+                end if
+                !* Applying NewtonRaphson method corrected
+                if (wlCalcMethod .eq. 3) then
+                    vel = qp(i,repeatInterval+1,j)/newArea(i,j)
+                    do while ( abs(toll) .gt. 0.001)
+                        iii = iii +1
+                        tempY_1 = tempDepthi_1 + z(i-1,j)
 
-							toll = tempDepthi_2 - tempDepthi_1
+                        call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempDepthi_1)**2.0,tempCo_1)
 
-							tempDepthi_1 = tempDepthi_2
+                        temp_q_sk_multi_1 = 1
+                        ! call calc_q_sk_multi(i-1,j,qp(i-1,repeatInterval+1,j),temp_q_sk_multi_1)
+                        tempCo_1 = tempCo_1 * temp_q_sk_multi_1
+                        call r_interpol(elevTable_1,areaTable_1,nel,tempY_1,tempArea_1)
+                        call r_interpol(elevTable_1,pereTable_1,nel,tempY_1,tempPere_1)
+                        call r_interpol(elevTable_1,rediTable_1,nel,tempY_1,tempRadi_1)
+                        call r_interpol(elevTable_1,topwTable_1,nel,tempY_1,tempbo_1)
+                        call r_interpol(elevTable_1,dKdATable_1,nel,tempY_1,tempdKdA_1)!    Change 20210520
 
-						end do
-						depthCalOk(i-1) = 1
-
-					end if
-
-					! Applying NewtonRaphson method corrected
-					if (wlCalcMethod .eq. 3) then
-						vel = qp(i,repeatInterval+1,j)/newArea(i,j)
-						do while ( abs(toll) .gt. 0.001)
-							iii = iii +1
-							tempY_1 = tempDepthi_1 + z(i-1,j)
-
-							call r_interpol(currentSquaredDepth_1,convTable_1,nel,(tempDepthi_1)**2.0,tempCo_1)
-							temp_q_sk_multi_1 = 1
-							! call calc_q_sk_multi(i-1,j,qp(i-1,repeatInterval+1,j),temp_q_sk_multi_1)
-							tempCo_1 = tempCo_1 * temp_q_sk_multi_1
-
-							call r_interpol(elevTable_1,areaTable_1,nel,tempY_1,tempArea_1)
-							call r_interpol(elevTable_1,pereTable_1,nel,tempY_1,tempPere_1)
-							call r_interpol(elevTable_1,rediTable_1,nel,tempY_1,tempRadi_1)
-							call r_interpol(elevTable_1,topwTable_1,nel,tempY_1,tempbo_1)
-							call r_interpol(elevTable_1,dKdATable_1,nel,tempY_1,tempdKdA_1)!    Change 20210520
-
-							tempsfi_1 = qp(i-1,repeatInterval+1,j) * abs(qp(i-1,repeatInterval+1,j)) / ( tempCo_1** 2.0 )!
-
-							temp_v_1 = qp(i-1,repeatInterval+1,j)/tempArea_1
-
-							ffy = tempDepthi_1- depthYi + dx(i-1,j)*slope - 0.5*dx(i-1,j)*(sfi + tempsfi_1)
-
-							dkda = tempdKdA_1
-
-							ffprime = 1 + dx(i-1,j) * tempbo_1 *  qp(i-1,repeatInterval+1,j) * &
+                        tempsfi_1 = qp(i-1,repeatInterval+1,j) * abs(qp(i-1,repeatInterval+1,j)) / ( tempCo_1** 2.0 )!
+                        temp_v_1 = qp(i-1,repeatInterval+1,j)/tempArea_1
+                        ffy = tempDepthi_1- depthYi + dx(i-1,j)*slope - 0.5*dx(i-1,j)*(sfi + tempsfi_1)
+                        dkda = tempdKdA_1
+                        ffprime = 1 + dx(i-1,j) * tempbo_1 *  qp(i-1,repeatInterval+1,j) * &
 								abs(qp(i-1,repeatInterval+1,j)) / (tempCo_1 ** 3.0) * dkda
-
-							if (ffprime .eq. 0.) then
+                        if (ffprime .eq. 0.) then
 								! print*, 'ffprime = 0'
 								! print*, j, i, qp(i-1,repeatInterval+1,j), tempCo_1
 								! pause
-							end if
+                        end if
+                        tempDepthi_1_new = tempDepthi_1 - ffy / ffprime
+                        tempDepthi_1_new = max(tempDepthi_1_new,0.005)
+                        toll = abs(tempDepthi_1_new - tempDepthi_1)
 
-							tempDepthi_1_new = tempDepthi_1 - ffy / ffprime
+                        if(iii .gt. 30)then
+                            print*, 'Warning: Depth iteration reached maximum trial at j=', j, 'i=', i-1 , 'and',i, &
+                            'depths are',tempDepthi_1, tempDepthi_1_new, 'slope=', slope, 'tempbo_1=',tempbo_1, 'dx=',&
+                            dx(i-1,j), 'Q=', qp(i-1,repeatInterval+1,j)
+                            print*, 'depth at d/s',depthYi
+                            depthCalOk(i-1) = 0
+                            EXIT
+                        endif
+                        tempDepthi_1 = tempDepthi_1_new
+                        depthCalOk(i-1) = 1
+                    enddo
+                endif      ! calculation of Wl based on d/s wl ends
 
-							tempDepthi_1_new = max(tempDepthi_1_new,0.005)
-
-							toll = abs(tempDepthi_1_new - tempDepthi_1)
-
-							if(iii .gt. 30)then
-								print*, 'Warning: Depth iteration reached maximum trial at j=', j, 'i=', i-1 , 'and',i, &
-								'depths are',tempDepthi_1, tempDepthi_1_new, 'slope=', slope, 'tempbo_1=',tempbo_1, 'dx=',&
-								dx(i-1,j), 'Q=', qp(i-1,repeatInterval+1,j)
-								print*, 'depth at d/s',depthYi
-								depthCalOk(i-1) = 0
-								EXIT
-							endif
-							tempDepthi_1 = tempDepthi_1_new
-							depthCalOk(i-1) = 1
-						end do
-
-					end if      ! calculation of Wl based on d/s wl ends
-
-
-					usFroud = abs(qp(i-1,repeatInterval+1,j))/sqrt(grav*tempArea_1**3.0/tempbo_1)
-
-					newY(i-1,j) = tempDepthi_1 + z(i-1,j)
-
-					! calculating the normal depth at i=i-1 using the slope between i and i-1
-					! Calculating the normal depth and critical depth at the river reach upstream as an output
-					! very small slope is creating an issue. Applying a min limit of bed slope.
-					! for Normal depth calculation, applying the absolute value of the Q
-					call normal_crit_y(i-1, j, q_sk_multi, max(slope,0.0001), max(abs(qp(i-1,repeatInterval+1,j)),min_Q),&
+                usFroud = abs(qp(i-1,repeatInterval+1,j))/sqrt(grav*tempArea_1**3.0/tempbo_1)
+                newY(i-1,j) = tempDepthi_1 + z(i-1,j)
+ 				! calculating the normal depth at i=i-1 using the slope between i and i-1
+                ! Calculating the normal depth and critical depth at the river reach upstream as an output
+                ! very small slope is creating an issue. Applying a min limit of bed slope.
+                ! for Normal depth calculation, applying the absolute value of the Q
+                call normal_crit_y(i-1, j, q_sk_multi, max(slope,0.0001), max(abs(qp(i-1,repeatInterval+1,j)),min_Q),&
 						y_norm, y_crit, area_norm, area_crit)
 
-					! to avoid sudden jump in water level calculation
-					! if the WL jumps abruptly, the tempsfi_1 would be very small compared to sfi.
-					! we are replacing the water level using normal water level
-					if (sfi / tempsfi_1 .gt. 1e5)  newY(i-1,j) = y_norm
+                ! to avoid sudden jump in water level calculation
+                ! if the WL jumps abruptly, the tempsfi_1 would be very small compared to sfi.
+                ! we are replacing the water level using normal water level
+                if (sfi / tempsfi_1 .gt. 1e5)  newY(i-1,j) = y_norm
 
-					! limiting very high value of WL
-					if (newY(i-1,j) .gt. 10.0**5.) newY(i-1,j) = 10.0**5.
+                ! limiting very high value of WL
+                if (newY(i-1,j) .gt. 10.0**5.) newY(i-1,j) = 10.0**5.
 
-					if (newY(i-1,j)-z(i-1,j) .le. 0.) then
+                if (newY(i-1,j)-z(i-1,j) .le. 0.) then
 						! print*, 'depth is negative at j= ', j,'i=',i-1,'newY=',(newY(jj,j),jj=1,ncomp)
 						! print*, 'dimensionless_D',(dimensionless_D(jj,j),jj=1,ncomp)
 						! print*, 'newQ',(qp(jj,repeatInterval+1,j),jj=1,ncomp)
 						! print*, 'Bed',(z(jj,j),jj=1,ncomp)
 						! print*, 'dx',(dx(jj,j),jj=1,ncomp-1)
 						! pause 777
-					end if
+                endif
+            endif      ! end of if (i .gt. 1) || end of WL calculation at j reach
+            ! Book-keeping: Counting the number as for how many time steps the routing method is unchanged
+            if (i .gt. 1) then
+                routingNotChanged(i-1,j) = routingNotChanged(i-1,j) + 1
+            endif
+        enddo
 
-				end if      ! end of if (i .gt. 1) || end of WL calculation at j reach
+        celerity(1:ncomp,j) =  sum(celerity2(1:ncomp)) / ncomp  ! change 20210524
+        do i = 1, ncomp
+            celerity(i,j) = max(celerity(i,j),0.5)   !!! Applying Celerity lower limit
+        end do
 
-				! Book-keeping: Counting the number as for how many time steps the routing method is unchanged
-				if (i .gt. 1) then
-					routingNotChanged(i-1,j) = routingNotChanged(i-1,j) + 1
-				end if 
-
-			end do
-
-			celerity(1:ncomp,j) =  sum(celerity2(1:ncomp)) / ncomp  ! change 20210524
-
-			do i = 1, ncomp
-				celerity(i,j) = max(celerity(i,j),0.5)   !!! Applying Celerity lower limit
-			end do
-
-			diffusivity(1:ncomp,j)=sum(diffusivity2(1:ncomp)) / ncomp
-
-			do i = 1, ncomp
-				if (diffusivity(i,j) .gt. maxDiffuLm) diffusivity(i,j) = maxDiffuLm !!! Applying diffusivity upper limit
-				if (diffusivity(i,j) .lt. minDiffuLm) diffusivity(i,j) = minDiffuLm !!! Applying diffusivity lower limit
-			end do
-
-	!!++++++++++++++++++++ Diffusive wave Backward sweep ends +++++++++++++++++++!!
-
+        diffusivity(1:ncomp,j)=sum(diffusivity2(1:ncomp)) / ncomp
+        do i = 1, ncomp
+            if (diffusivity(i,j) .gt. maxDiffuLm) diffusivity(i,j) = maxDiffuLm !!! Applying diffusivity upper limit
+            if (diffusivity(i,j) .lt. minDiffuLm) diffusivity(i,j) = minDiffuLm !!! Applying diffusivity lower limit
+        end do
 	end subroutine mesh_diffusive_backward
-
     !**-----------------------------------------------------------------------------------------
     !*      Create lookup tables at each node storing computed values of channel geometries
     !*      such as area and conveyance and normal/critical depth for possible ranges of
@@ -913,7 +906,7 @@ contains
     !**-----------------------------------------------------------------------------------------
     subroutine readXsection(k,lftBnkMann,rmanning_main,rgtBnkMann,leftBnkX_given,rghtBnkX_given,timesDepth,num_reach,&
                             z_ar_g, bo_ar_g, traps_ar_g, tw_ar_g, twcc_ar_g )
-		
+
 		implicit none
 		save
 
@@ -943,7 +936,7 @@ contains
         allocate (compoundSKK(nel), elev(nel))
         allocate (i_start(nel), i_end(nel))
         allocate (totalNodes(3))
-		
+
 		leftBnkX=leftBnkX_given
         rghtBnkX=rghtBnkX_given
         startFound = 0
@@ -959,7 +952,7 @@ contains
         f2m=1.0
         allocate (xcs(maxTableLength), ycs(maxTableLength))
         allocate (allXcs(maxTableLength,3), allYcs(maxTableLength,3))
-		
+
         do i=1, maxTableLength
             !* channel x-section vertices at a given segment
             if (i==1) then
@@ -994,7 +987,7 @@ contains
         mainChanStrt=3
         mainChanEnd=6
         num=i
-		
+
         if (leftBnkX .lt. minval(xcs(2:num-1))) leftBnkX = minval(xcs(2:num-1))
         if (rghtBnkX .gt. maxval(xcs(2:num-1))) rghtBnkX = maxval(xcs(2:num-1))
 
@@ -1177,7 +1170,7 @@ contains
         end do
 
         do j = 1,nel
-            
+
 			el_now=el1(j,1)
             if (j .eq. 1) then
                 newdPdA(j) = sum(peri1(j,:)) / sum(a1(j,:))
@@ -1190,7 +1183,7 @@ contains
             compoundMann = sqrt((abs(peri1(j,1))*lftBnkMann ** 2. + abs(peri1(j,2))*rmanning_main ** 2.+&
              abs(peri1(j,3))*rgtBnkMann ** 2.) / (abs(peri1(j,1))+abs(peri1(j,2))+abs(peri1(j,3))))
             compoundSKK(j) = 1. / compoundMann
-			
+
 			redi1All(j)=sum(a1(j,:)) /sum(peri1(j,:))
             xsec_tab(1,j,k,num_reach) = el1(j,1)
             xsec_tab(2,j,k,num_reach) = sum(a1(j,:))
@@ -1204,7 +1197,7 @@ contains
             xsec_tab(11,j,k,num_reach) = compoundSKK(j)
         end do
         z(k,num_reach)= el_min
-		
+
 		deallocate (el1, a1, peri1, redi1, redi1All)
         deallocate (conv1, tpW1, diffArea, newI1, diffPere)
         deallocate (newdPdA, diffAreaAll, diffPereAll, newdKdA)       ! change Nazmul 20210601
@@ -1288,7 +1281,7 @@ contains
 	! !*--------------------------------------------------
     ! !*        Time Interpolation
     ! !
-    ! !*--------------------------------------------------	
+    ! !*--------------------------------------------------
 	! double precision function r_interpol_time(x,y,jj,xt)
 
 		! integer, intent(in) :: jj
@@ -1322,7 +1315,7 @@ contains
 		! ! print*,xt
 		! return
 	! end function
-	
+
 	! !*--------------------------------------------------
     ! !*        Nearest Neighbour Interpolation
     ! !
@@ -1427,7 +1420,7 @@ contains
             locate=jl
         end if
     end function locate
-	
+
 endmodule diffusive
 
 
