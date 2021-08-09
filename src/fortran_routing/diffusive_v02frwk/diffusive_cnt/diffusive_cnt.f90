@@ -72,7 +72,7 @@ contains
                         nts_ql_g, nts_ub_g, nts_db_g, &
                         mxncomp_g, nrch_g, z_ar_g, bo_ar_g, traps_ar_g, tw_ar_g, twcc_ar_g, &
                         mann_ar_g, manncc_ar_g, so_ar_g, dx_ar_g, iniq, &
-                        !nhincr_m_g, nhincr_f_g, ufhlt_m_g,  ufqlt_m_g, ufhlt_f_g, ufqlt_f_g, &
+                        nhincr_m_g, nhincr_f_g, ufhlt_m_g,  ufqlt_m_g, ufhlt_f_g, ufqlt_f_g, &
                         frnw_col, dfrnw_g, qlat_g, ubcd_g, dbcd_g, &
                         cfl_g, theta_g, tzeq_flag_g, y_opt_g, so_llm_g, &
                         ntss_ev_g, q_ev_g, elv_ev_g)
@@ -81,13 +81,13 @@ contains
 
 		integer, intent(in) :: mxncomp_g, nrch_g
         integer, intent(in) :: nts_ql_g, nts_ub_g, nts_db_g, ntss_ev_g
-        integer, intent(in) :: frnw_col !, nhincr_m_g, nhincr_f_g,
+        integer, intent(in) :: frnw_col, nhincr_m_g, nhincr_f_g
         double precision,intent(in) :: dtini_g, t0_g, tfin_g, saveinterval_g, saveinterval_ev_g, dt_ql_g, dt_ub_g, dt_db_g
 
         double precision, dimension(mxncomp_g, nrch_g), intent(in) :: z_ar_g, bo_ar_g, traps_ar_g, tw_ar_g, twcc_ar_g
         double precision, dimension(mxncomp_g, nrch_g), intent(in) :: mann_ar_g, manncc_ar_g, dx_ar_g, iniq
-        !double precision, dimension(mxncomp_g, nrch_g, nhincr_m_g), intent(in) :: ufhlt_m_g,  ufqlt_m_g
-        !double precision, dimension(mxncomp_g, nrch_g, nhincr_f_g), intent(in) :: ufhlt_f_g, ufqlt_f_g
+        double precision, dimension(mxncomp_g, nrch_g, nhincr_m_g), intent(in) :: ufhlt_m_g,  ufqlt_m_g
+        double precision, dimension(mxncomp_g, nrch_g, nhincr_f_g), intent(in) :: ufhlt_f_g, ufqlt_f_g
 
         double precision, dimension(nrch_g, frnw_col), intent(in) :: dfrnw_g !* set frnw_col=10
         double precision, dimension(nts_ql_g, mxncomp_g, nrch_g), intent(in) :: qlat_g
@@ -118,22 +118,37 @@ contains
         integer :: num_points, totalChannels
         double precision :: dmy1, dmy2
         integer :: ndata, idmy1, nts_db_g2
-        double precision :: slope, y_norm, area_n, temp, tc_cnt
+        double precision :: slope, y_norm, area_n, temp, tc_cnt, rmnd, saveinterval_min
+
+!        open(unit=11,file="./output/q elv.txt",status='unknown')
+!        open(unit=10, file="./output/any_adam.txt", status='unknown')
+!        open(unit=8, file="./output/output_wl_adam.txt", status='unknown')
+!        open(unit=9, file="./output/q_adam.txt", status='unknown')
+
 
 		! simulation timestep
-        dtini=dtini_g
+        dtini=dtini_g  !*[sec]
         dtini_given=dtini
 		! simulation intial time (hrs)
         t0=t0_g
 		! simulation final time (hrs)
         tfin=tfin_g
-		! Total number of timesteps in the simulation
+        ! saving interval (seconds)
+        saveInterval=saveinterval_ev_g  !*[sec]
+		! number of simulation timesteps per save
+        saveFrequency=saveInterval / dtini_given
+        ! Total number of timesteps in the simulation
 		totalTimeSteps = floor((tfin - t0)/dtini*3600)+1
 		! repeat interval (number of timesteps)
 		!repeatInterval = int(60.*60./dtini_given) ! TO DO, define in terms of a parameter
 		! number of timesteps per repeatInterval
         !ntim=repeatInterval+5 ! +1 because of boundary effects, at least 1 extra necessary
-		ntim= int(70.*60./dtini_given)+1
+!        repeatInterval = int(60.*60./dtini_given)
+!		ntim= int(70.*60./dtini_given)+1
+        repeatInterval = int(saveInterval/dtini_given)
+		ntim= repeatInterval+2
+
+
 		num_time=ntim
 		! number of reaches in the network
 		nlinks=nrch_g
@@ -146,14 +161,14 @@ contains
         timesDepth= 4.0
 		! number of rows in channel geometry attribute tables
         nel= 501
-		! saving interval (seconds)
-        saveInterval=saveInterval_ev_g
-		! number of simulation timesteps per save
-        saveFrequency=saveInterval / dtini_given
+
 		! maximum number of segments in a single reach - redundant?
         num_points= mxncomp
 		! number of reaches in the network - redundant?
         totalChannels= nlinks
+
+        minDiffuLm= 50.0
+        maxDiffuLm= 400.0
 
 
         allocate(area(num_points))
@@ -226,6 +241,7 @@ contains
         allocate(currentROutingDiffusive(nlinks))
         allocate(tarr_ql(nts_ql_g), varr_ql(nts_ql_g))
         allocate(tarr_ub(nts_ub_g), varr_ub(nts_ub_g))
+        allocate(tarr_db(nts_db_g), varr_db(nts_db_g))
 
 		! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 		! identify minimum dx (segment length) in the network
@@ -243,8 +259,12 @@ contains
         ! TO DO:
 		! * pass initial depth as initial conditions and dont arbitrarily intialize
 		z=z_ar_g
+        !* test
         ini_y=0.05  !* [meter]
-        ini_q=20.0 !0.5   !*[m^3/sec]
+        ini_q(1)=1.0 !0.5   !*[m^3/sec]
+        ini_q(2)=1.0
+        ini_q(3)=2.0
+
         oldQ = -999; oldY = -999; newQ = -999; newY = -999
         dimensionless_Cr = -999; dimensionless_Fo = -999; dimensionless_Fi = -999
         dimensionless_Di = -999; dimensionless_Fc = -999; dimensionless_D = -999
@@ -304,12 +324,6 @@ contains
         do j = 1, nlinks
             ncomp= frnw_g(j,1)
             !* upstream boundary condition for head water reach
-!            if (instrdflag(j,1) .eq. 2) then
-!                ! interpolation of boundaries at the desired time step
-!                newQ(1,1,j)=r_interpol_time(USBoundary(1, 1:upBoundTableEntry(ppn), ppn), &
-!                    USBoundary(2, 1:upBoundTableEntry(ppn), ppn),upBoundTableEntry(ppn),t)
-!                ppn = ppn +1
-!            end if
             if (frnw_g(j,3)==0) then !* frnw_g(j,3) indicates the number of upstream reaches.
                 do n=1,nts_ub_g
                     varr_ub(n)= ubcd_g(n,j)
@@ -317,24 +331,18 @@ contains
                 newQ(1,1,j)= intp_y(nts_ub_g, tarr_ub, varr_ub, t) !* tarr_ub in min.
             endif
             !* downstream boundary condition for TW reach
-!            if (instrdflag(j,2) .eq. 1) then
-!                ! interpolation of boundaries at the desired time step
-!                oldY(ncomp,j)=r_interpol_time(DSBoundary(1, 1:downBoundTableEntry(qqn), qqn), &
-!                    DSBoundary(2, 1:downBoundTableEntry(qqn), qqn),downBoundTableEntry(qqn),t)
-!                qqn = qqn +1
-!            end if
             if (frnw_g(j,2)<0.0) then
                 !* 1. measured data
-                do n=1,nts_db_g
-                    varr_db(n)= dbcd_g(n) + z(ncomp,j) !* when dbcd is water stage, channel bottom elev is added.
-                enddo
-                oldY(ncomp,j)= intp_y(nts_db_g, tarr_db, varr_db, t)
+!                do n=1,nts_db_g
+!                    varr_db(n)= dbcd_g(n) + z(ncomp,j) !* when dbcd is water stage, channel bottom elev is added.
+!                enddo
+!                oldY(ncomp,j)= intp_y(nts_db_g, tarr_db, varr_db, t)
                 ! 2. normal depth as TW boundary condition
-!                q_sk_multi=1.0
-!                slope = (z(ncomp-1,j)-z(ncomp,j))/dx(ncomp-1,j)
-!                if (slope .le. 0.0001) slope = 0.0001
-                !* oldY below takes normal depth value as a result.
-!                call normal_crit_y(ncomp, j, q_sk_multi, slope, oldQ(ncomp,j), oldY(ncomp,j), temp,  oldArea(ncomp,j), temp)
+                q_sk_multi=1.0
+                slope = (z(ncomp-1,j)-z(ncomp,j))/dx(ncomp-1,j)
+                if (slope .le. 0.0001) slope = 0.0001
+                !oldY below takes normal depth value as a result.
+                call normal_crit_y(ncomp, j, q_sk_multi, slope, oldQ(ncomp,j), oldY(ncomp,j), temp,  oldArea(ncomp,j), temp)
             endif
         end do
         ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -388,16 +396,17 @@ contains
 			end do
 		end do
 
-        repeatInterval = int(60.*60./dtini_given)
 
+        ts_ev=0
 		do kkk = 1,totalTimeSteps-1, repeatInterval
 			! first time of kkk-th repeatInterval (minutes)
-			ini_time = real(kkk-1)*dtini/60.+t0*60.
+			ini_time = real(kkk-1)*dtini/60.0+t0*60.0
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 			!    Discharge computation using CNT method
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 			do j = 1, nlinks
 				ncomp = frnw_g(j,1)
+				lateralFlow(:,:,j) = 0 !* initialize at each reach j
 
                 do timestep=1, ntim
 					! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -413,12 +422,12 @@ contains
                         do n=1,nts_ub_g
                             varr_ub(n)= ubcd_g(n,j)
                         enddo
-                        tc_cnt= ini_time+dtini/60.*real(timestep-1)
+                        tc_cnt= ini_time+dtini/60.0*real(timestep-1)
                         newQ(1, timestep, j)= intp_y(nts_ub_g, tarr_ub, varr_ub, tc_cnt) !* tarr_ub in min.
                     end if
 					!* junction boundary
 					if (frnw_g(j,3).gt.0) then  ! reach boundary originates from a junction
-						newQ(1,timestep,j) = 0.
+						newQ(1,timestep,j) = 0.0
 						do k=1, frnw_g(j,3)
 							linknb= frnw_g(j,3+k)
 							nodenb= frnw_g(linknb,1)
@@ -429,26 +438,26 @@ contains
 					! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 					! populate lateral inflow array
 					! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-					lateralFlow(:,:,j) = 0
-!					do i=1,ncomp-1
-!						do n=1,nts_ql_g
-!							varr_ql(n)= qlat_g(n,i,j)
-!						enddo
-!						lateralFlow(i,timestep,j)= intp_y(nts_ql_g, tarr_ql, varr_ql, ini_time+dtini/60.*(timestep-1)) ! tarr_ql in minutes
-!					end do
                     do i=1,ncomp-1
 				    	do n=1,nts_ql_g
 				    	    varr_ql(n)= qlat_g(n,i,j) !* qlat_g(n,i,j) in unit of m2/sec
 				    	enddo
-				    	tc_cnt= ini_time+dtini/60.*real(timestep-1)
+				    	tc_cnt= ini_time+dtini/60.0*real(timestep-1) !*[min]
                         lateralFlow(i, timestep, j)= intp_y(nts_ql_g, tarr_ql, varr_ql, tc_cnt)
                     enddo
          			!* head water reach
-                    if (frnw_g(j,3)==0) then
+                    !if (frnw_g(j,3)==0) then
                         newQ(1,timestep,j) = newQ(1,timestep,j)+lateralFlow(1,timestep,j)*dx(1,j)
                         lateralFlow(1,timestep,j) = 0.0       ! lateral flow at i = 1 is already added to the u/s
-                    endif
+                    !endif
+!                    print*, "time", j, timestep, dtini, ini_time, tc_cnt
 				enddo !* do timestep=1, ntim
+				!lateralFlow(1,:,j) = 0.       ! lateral flow at i = 1 is already added
+				!* test
+!                do timestep = 1,repeatInterval,saveFrequency
+!                    tc_cnt= ini_time+real(timestep-1)*dtini/60.
+!                    write(10, *) tc_cnt, j, (lateralFlow(i,timestep,j), i=1, 3)
+!                end do
 				! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 				! Diffusive wave forward sweep to calculate flow at t+1
 				! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -458,20 +467,6 @@ contains
 
 				newQ(:,:,j) = qp(:,:,j)
 			enddo  !* j = 1, nlinks
-
-			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-			! Write flow results to q_ev_g array
-			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-			do timestep = 1,repeatInterval,saveFrequency
-				ts_ev = ((ini_time*60.0)/dtini) + (timestep)
-				do j=1,nlinks
-					ncomp = frnw_g(j,1)
-					do i=1, ncomp
-						q_ev_g(ts_ev, i, j)= newQ(i,timestep,j)
-					end do
-				end do
-			end do
-
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 			! DEPTH, CELERITY, and DIFFUSIVITY CALCULATION
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -484,17 +479,19 @@ contains
 				if (frnw_g(j,2) < 0.0) then    ! use normal depth water depth calculation
                     !* TW reach
                     !* 1. measured data at TW
-                    do n=1,nts_db_g
-                        varr_db(n)= dbcd_g(n) + z(ncomp,j) !* when dbcd is water stage, channel bottom elev is added.
-                    enddo
-                    tc_cnt= ini_time+dtini/60.*real(repeatInterval)
-                    newY(ncomp,j)= intp_y(nts_db_g, tarr_db, varr_db, tc_cnt)
+!                    do n=1,nts_db_g
+!                        varr_db(n)= dbcd_g(n) + z(ncomp,j) !* when dbcd is water stage, channel bottom elev is added.
+!                    enddo
+!                    tc_cnt= ini_time+dtini/60.*real(repeatInterval)
+!                    newY(ncomp,j)= intp_y(nts_db_g, tarr_db, varr_db, tc_cnt)
                    ! 2. normal depth as TW boundary condition
-                    !q_sk_multi=1.0
-                    !slope = (z(ncomp-1,j)-z(ncomp,j))/dx(ncomp-1,j)
-                    !if (slope .le. 0.0001) slope = 0.0001
-                    !call normal_crit_y(ncomp, j, q_sk_multi, slope, newQ(ncomp,j), newY(ncomp,j), temp, newArea(ncomp,j), temp)
-				elseif (frnw_g(j,2) .ge. 0.0) then    ! water level is calculated from the downstream river reach
+                    timestep= int(saveInterval/dtini) + 1
+                    q_sk_multi=1.0
+                    slope = (z(ncomp-1,j)-z(ncomp,j))/dx(ncomp-1,j)
+                    if (slope .le. 0.0001) slope = 0.0001
+                    dmy1=newQ(ncomp,timestep,j)
+                    call normal_crit_y(ncomp, j, q_sk_multi, slope, dmy1, newY(ncomp,j), temp, newArea(ncomp,j), temp)
+                elseif (frnw_g(j,2) .ge. 0.0) then    ! water level is calculated from the downstream river reach
 					!* Not TW reach
 					linknb=frnw_g(j,2) ! reach downstream of j
 					newY(ncomp,j)= newY(1,linknb)   ! taking the WL from the d/s reach
@@ -504,39 +501,82 @@ contains
 
 			end do
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-			! Write depth results to q_ev_g array
+			! Write q and depth results to q_ev_g array
 			! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-			do timestep = 1,repeatInterval,saveFrequency
-				ts_ev = ((ini_time*60.0)/dtini) + (timestep)
-				do j=1,nlinks
-					ncomp = frnw_g(j,1)
-					do i=1, ncomp
-						elv_ev_g(ts_ev, i, j)= newY(i,j) ! this will just repeat the deth value for all steps in the repeatInterval
-					end do
-				end do
-			end do
-            !* test
-            do j=1,nlinks
-                ncomp = frnw_g(j,1)
-                write(8, 10) ini_time+real(repeatInterval)*dtini/60.,j, (newY(i,j), i=1, ncomp)
-                write(95, 10) ini_time+real(repeatInterval)*dtini/60.,j, (celerity(i,j), i=1, ncomp)
-                write(96, 10) ini_time+real(repeatInterval)*dtini/60.,j, (diffusivity(i,j), i=1, ncomp)
-                write(991, 10) ini_time+real(repeatInterval)*dtini/60.,j, (newY(i,j)-z(i,j), i=1, ncomp)
-                write(993, 10) ini_time+real(repeatInterval)*dtini/60.,j, (velocity(i,j), i=1, ncomp)
-                courant= -999.
-                do i=1,ncomp-1
-                    courant(i) = celerity(i,j) * dtini / dx(i,j)
+			if (ini_time==t0*60.0) then
+                timestep=1
+                ts_ev=ts_ev+1
+                do j=1,nlinks
+                    ncomp = frnw_g(j,1)
+                    do i=1, ncomp
+                        q_ev_g(ts_ev, i, j)= newQ(i,timestep,j)
+                        !print*, "q_ev at ini", ts_ev,timestep, i,j,q_ev_g(ts_ev, i, j)
+                    end do
                 end do
-                 write(9921, 10) ini_time+real(repeatInterval)*dtini/60.,j, (courant(i), i=1, ncomp)
-            end do
+            endif
+
+			do timestep=2, ntim
+				tc_cnt= ini_time+dtini/60.*real(timestep-1) !*[min]
+				rmnd=dmod(tc_cnt, saveinterval/60.0)
+                if ((rmnd<0.0001).or.(tc_cnt==tfin)) then
+                    ts_ev=ts_ev+1
+                    do j=1,nlinks
+                        ncomp = frnw_g(j,1)
+                        do i=1, ncomp
+                            q_ev_g(ts_ev, i, j)= newQ(i,timestep,j)
+                            elv_ev_g(ts_ev, i, j)= newY(i,j) ! this will just repeat the deth value for all steps in the repeatInterval
+                            !print*, "q_ev", ts_ev,  tc_cnt, i, j, q_ev_g(ts_ev, i, j)
+                        end do
+                    end do
+                endif
+			enddo
+            !* test
+!            do timestep = 1,repeatInterval
+!                do j=1,nlinks
+!                    tc_cnt= ini_time+real(timestep-1)*dtini/60.
+!                    write(9,  10) tc_cnt, j, (newQ(i,timestep,j), i=1, 3)
+!                    print*, ini_time, timestep, tc_cnt, j
+!                end do
+!            end do
+!            !* test
+!            do j=1,nlinks
+!                ncomp = frnw_g(j,1)
+!                !print*, ini_time+real(repeatInterval)*dtini/60.,j, (newY(i,j), i=1, ncomp)
+!                write(8, 10) ini_time+real(repeatInterval)*dtini/60.,j, (newY(i,j), i=1, ncomp)
+!!                write(95, 10) ini_time+real(repeatInterval)*dtini/60.,j, (celerity(i,j), i=1, ncomp)
+!!                write(96, 10) ini_time+real(repeatInterval)*dtini/60.,j, (diffusivity(i,j), i=1, ncomp)
+!!                write(991, 10) ini_time+real(repeatInterval)*dtini/60.,j, (newY(i,j)-z(i,j), i=1, ncomp)
+!!                write(993, 10) ini_time+real(repeatInterval)*dtini/60.,j, (velocity(i,j), i=1, ncomp)
+!!                courant= -999.
+!!                do i=1,ncomp-1
+!!                    courant(i) = celerity(i,j) * dtini / dx(i,j)
+!!                end do
+!!                 write(9921, 10) ini_time+real(repeatInterval)*dtini/60.,j, (courant(i), i=1, ncomp)
+!            end do
 
 			oldY = newY
+
+			!test
+!			if (kkk.gt.500) then
+!                pause
+!            end if
+
+
 
 		end do ! end kkk loop
 
         print *, 'completed diffusive network simulation'
         10  format(f12.5 ,i6, 2200f14.4)
         11  format(f12.5 ,i6, 2200i6)
+            !* test
+!            do ts_ev = 1, int(tfin_g*3600.0/saveInterval)
+!				do j=1,nlinks
+!					ncomp = frnw_g(j,1)
+!					do i=1, ncomp
+!                        write(11,*) ts_ev,real(ts_ev-1)*saveInterval/60.0, i, j, q_ev_g(ts_ev, i, j), elv_ev_g(ts_ev, i, j)
+!					end do
+!				end do
+!			end do
 
         deallocate(frnw_g)
         deallocate(area, bo, pere, areap, qp, z, dqp, dqc, dap, dac, depth, sk, co, dx)
@@ -566,6 +606,7 @@ contains
 		double precision,allocatable :: E_cnt(:,:), F_cnt(:,:)
 		integer :: i, n, kk
 		double precision :: hi, gi, ki, pj, qj, rj, pj_p, qj_p, rj_p, sj_p, mi, ni, qp_ghost, qp_ghost_1
+!        open(unit=20, file="./output/diffusive_CNT_adam.txt", status='unknown')
 
 		ncomp = frnw_g(j,1)
 		allocate(E_cnt(ncomp,ntim))
@@ -574,6 +615,7 @@ contains
 		E_cnt(1:ncomp,1) = ini_E(1:ncomp,j)
 		F_cnt(1:ncomp,1) = ini_F(1:ncomp,j)
 
+!		write(20,*)
 		do i = 2,ncomp
 			do n = 2, ntim
 				hi = dx(i-1,j) / (dtini * celerity(i-1,j))
@@ -590,6 +632,8 @@ contains
 				qj_p = 1.0 - gi + 4.0 * ki
 				rj_p = -hi / 4.0 + gi / 2.0 - 2.0 * ki
 
+				!print*, hi, gi, ki, mi, ni, pj, qj, rj, pj_p, qj_p, rj_p
+
 				if (n .eq. ntim) then
 					! applying ghost node !&
 					sj_p = pj_p * qp(i-1,n-1,j) + qj_p * qp(i-1,n,j) + rj_p * qp_ghost_1 &
@@ -603,19 +647,23 @@ contains
 
 				E_cnt(i,n) = -1.0 * rj / (pj * E_cnt(i,n-1) + qj)
 				F_cnt(i,n) = ( sj_p - pj * F_cnt(i,n-1) ) / ( pj * E_cnt(i,n-1) + qj )
+!				            write(20,*) "coeff", i, n, j, hi, gi, ki, mi, ni, pj, qj, rj, pj_p, qj_p, &
+!                            rj_p, sj_p, E_cnt(i,n), F_cnt(i,n)
 			end do
 
 			qp_ghost = qp(i-1,ntim,j)+lateralFlow(i-1,ntim,j)*dx(i-1,j)
 			qp_ghost_1 = qp_ghost
 			! boundary at t=ntim, calculated from the ghost node at t=ntim+1
 			qp(i,ntim,j) = E_cnt(i,ntim) * qp_ghost + F_cnt(i,ntim)
-
+!            write(20,*)
 			do n = ntim-1,1,-1
 				qp(i,n,j) = E_cnt(i,n) * qp(i,n+1,j) + F_cnt(i,n)
 				if (qp(i,n,j) .lt. min_Q) then
 					added_Q(i,n,j) = min_Q - qp(i,n,j)
 					qp(i,n,j) = max(qp(i,n,j),min_Q)
 				end if
+!				print*, "qp(i,n,j)", i,n,j, qp(i,n,j)
+!				 write(20,*) "qp", i, n, j, qp_ghost, qp(i,n,j)
 			enddo
 		enddo  !* do i = 2,ncomp
 
@@ -656,6 +704,9 @@ contains
 		integer :: depthCalOk(mxncomp), wlCalcMethod
 		integer :: i, pp
 		double precision :: unity
+
+!        open(unit=21, file="./output/diffusive_backward_adam.txt", status='unknown')
+
 		unity = 1.0
         D_lim1 = -10.
         D_lim2 = -15.
@@ -665,9 +716,9 @@ contains
         ! wlCalcMethod = 6 : Only Normal depth
         wlCalcMethod = 3
         depthCalOk(ncomp) = 1
-        q_sk_multi = 1
-
+        q_sk_multi = 1.0
         ncomp = frnw_g(j,1)
+!        write(21,*)
         do i=ncomp,1,-1
             currentQ = qp(i,repeatInterval+1,j)
             ! call calc_q_sk_multi(i,j,currentQ,q_sk_multi)
@@ -783,6 +834,7 @@ contains
                         tempDepthi_1 = tempY_3 - z(i-1,j)
                         depthCalOk(i-1) = 1
                     enddo
+!                    write(21,*) "wlcalmethod 1", i, j, tempY_1, tempY_2, tempY_3, tempDepthi_1
                 endif
                 !** Applying simple iteration method with inclusion of dU/dX
                 if (wlCalcMethod .eq. 2) then
@@ -853,6 +905,7 @@ contains
                         tempDepthi_1 = tempDepthi_1_new
                         depthCalOk(i-1) = 1
                     enddo
+!                    write(21,*) "wlcalmethod 3", i, j, qp(i,repeatInterval+1,j), newArea(i,j), vel, tempDepthi_1
                 endif      ! calculation of Wl based on d/s wl ends
 
                 usFroud = abs(qp(i-1,repeatInterval+1,j))/sqrt(grav*tempArea_1**3.0/tempbo_1)
@@ -880,6 +933,7 @@ contains
 						! print*, 'dx',(dx(jj,j),jj=1,ncomp-1)
 						! pause 777
                 endif
+!                print*, "newY(i-1,j)", i-1, j, newY(i-1,j)
             endif      ! end of if (i .gt. 1) || end of WL calculation at j reach
             ! Book-keeping: Counting the number as for how many time steps the routing method is unchanged
             if (i .gt. 1) then
@@ -893,9 +947,12 @@ contains
         end do
 
         diffusivity(1:ncomp,j)=sum(diffusivity2(1:ncomp)) / ncomp
+!        write(21,*)
         do i = 1, ncomp
             if (diffusivity(i,j) .gt. maxDiffuLm) diffusivity(i,j) = maxDiffuLm !!! Applying diffusivity upper limit
             if (diffusivity(i,j) .lt. minDiffuLm) diffusivity(i,j) = minDiffuLm !!! Applying diffusivity lower limit
+!            print*, "C","D", i,j,celerity(i,j), diffusivity(i,j)
+!            write(21,*) "Y/C/D", i,j, newY(i,j),  celerity(i,j), diffusivity(i,j)
         end do
 	end subroutine mesh_diffusive_backward
     !**-----------------------------------------------------------------------------------------
@@ -929,6 +986,9 @@ contains
         doubleprecision :: leftBnkY, rghtBnkY,rmanning
         integer:: mainChanStrt, mainChanEnd,  kkk, startFound, endFound
         doubleprecision :: hbf
+        doubleprecision :: dmy1, dmy2, dmy3, dmy4, dmy5
+
+!        open(unit=100, file="./output/xseclt_adam.txt", status='unknown')
 
         allocate (el1(nel,3),a1(nel,3),peri1(nel,3),redi1(nel,3),redi1All(nel))
         allocate (conv1(nel,3), tpW1(nel,3), diffArea(nel,3), newI1(nel,3), diffPere(nel,3))
@@ -1055,7 +1115,7 @@ contains
         el_incr=el_range/real(nel-6.0)
 
         do kkk = 6,nel
-            elev(kkk) = elev(5)+el_incr * (kkk-5)
+            elev(kkk) = elev(5)+el_incr * real(kkk-5)
         end do
 
         xcs = 0.
@@ -1134,7 +1194,10 @@ contains
                              -cal_dist(x_start,el_now,xcs(i1+1),ycs(i1+1))
                     if(i2.eq.(num-1))cal_peri=cal_peri    &
                              -cal_dist(x_end,el_now,xcs(i2),ycs(i2))
-
+!                    dmy1= cal_tri_area(el_now,x_start,xcs(i1+1),ycs(i1+1))
+!                    dmy2= cal_multi_area(el_now,xcs,ycs,maxTableLength,i1+1,i2)
+!                    dmy3= cal_tri_area(el_now,x_end,xcs(i2),ycs(i2))
+!                    print*, "xseclt",  kkk, j, i, el_now, dmy1, dmy2, dmy3, cal_area
                 enddo
 
                 el1(j,kkk)=el_now
@@ -1195,6 +1258,8 @@ contains
             xsec_tab(8,j,k,num_reach) = newdPdA(j)
             xsec_tab(9,j,k,num_reach) = newdKdA(j)
             xsec_tab(11,j,k,num_reach) = compoundSKK(j)
+!            write(100,*) j,k,num_reach, xsec_tab(1,j,k,num_reach), xsec_tab(2,j,k,num_reach), xsec_tab(3,j,k,num_reach),&
+!                                xsec_tab(4,j,k,num_reach),xsec_tab(5,j,k,num_reach), xsec_tab(6,j,k,num_reach)
         end do
         z(k,num_reach)= el_min
 
@@ -1277,77 +1342,6 @@ contains
                 return
             endfunction cal_perimeter
     endsubroutine readXsection
-
-	! !*--------------------------------------------------
-    ! !*        Time Interpolation
-    ! !
-    ! !*--------------------------------------------------
-	! double precision function r_interpol_time(x,y,jj,xt)
-
-		! integer, intent(in) :: jj
-		! real, intent(in) :: x(jj), y(jj)
-		! real, intent(in) :: xt
-		! integer :: j
-		! real :: yt
-		! !real(kind=8), intent(out) :: r_interpol_time
-
-
-		! if (xt.le.maxval(x) .and. xt.ge.minval(x)) then
-			! do j=1,jj-1
-				! if((x(j)-xt)*(x(j+1)-xt).le.0)then
-
-					! yt=(xt-x(j))/(x(j+1)-x(j))*(y(j+1)-y(j))+y(j)
-
-					! EXIT
-				! endif
-			! end do
-		! else
-			! ! print*, xt, ' is not within the limit'
-			! ! print*, 'maxval(x)= ', maxval(x), 'and minval(x)=', minval(x),'so',  xt, ' is not within the limit'
-			! ! print*, 'jj', jj
-			! ! print*, 'x', (x(i), i=1, jj)
-			! ! print*, 'y', (y(i), i=1, jj)
-			! ! stop
-			! ! !if (xt.le. minval(x)) yt=minval(y)
-			! ! !if (xt.ge. maxval(x)) yt=maxval(y)
-		! end if
-		! r_interpol_time = yt
-		! ! print*,xt
-		! return
-	! end function
-
-	! !*--------------------------------------------------
-    ! !*        Nearest Neighbour Interpolation
-    ! !
-    ! !*--------------------------------------------------
-	! double precision function r_interpol_nn(x,y,jj,xt)
-
-		! integer, intent(in) :: jj
-		! real, intent(in) :: xt, x(jj), y(jj)
-		! integer :: j
-
-		! real :: yt
-
-		! ! nn means nearest neighbour
-
-		! if (xt.le. x(1)) then
-			! yt=y(1)
-		! elseif (xt.ge. x(jj)) then
-			! yt=y(jj)
-		! else
-			! do j=1,jj-1
-				! if((x(j)-xt)*(x(j+1)-xt).le.0)then
-
-					! yt=(xt-x(j))/(x(j+1)-x(j))*(y(j+1)-y(j))+y(j)
-
-					! EXIT
-				! endif
-			! end do
-		! end if
-		! r_interpol_nn = yt
-		! return
-	! end function
-
     !*--------------------------------------------------
     !*                 Linear Interpolation
     !
