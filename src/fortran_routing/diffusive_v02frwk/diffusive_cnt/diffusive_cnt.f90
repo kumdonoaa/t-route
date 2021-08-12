@@ -117,7 +117,7 @@ contains
         integer :: frj, iseg, i1, ts_ev
         integer :: num_points, totalChannels
         double precision :: dmy1, dmy2
-        integer :: ndata, idmy1, nts_db_g2
+        integer :: ndata, idmy1, nts_db_g2, idxql
         double precision :: slope, y_norm, area_n, temp, tc_cnt, rmnd, saveinterval_min
 
 !        open(unit=11,file="./output/q elv.txt",status='unknown')
@@ -325,7 +325,7 @@ contains
 !                enddo
 !                oldY(ncomp,j)= intp_y(nts_db_g, tarr_db, varr_db, t)
                 ! 2. normal depth as TW boundary condition
-!                q_sk_multi=1.0
+                q_sk_multi=1.0
                 slope = (z(ncomp-1,j)-z(ncomp,j))/dx(ncomp-1,j)
                 if (slope .le. 0.0001) slope = 0.0001
                 !oldY below takes normal depth value as a result.
@@ -418,12 +418,24 @@ contains
 					! populate lateral inflow array : lateralFlow in m2/sec
 					! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
                     do i=1,ncomp-1
-				    	do n=1,nts_ql_g
-				    	    varr_ql(n)= qlat_g(n,i,j) !* qlat_g(n,i,j) in unit of m2/sec
-				    	enddo
-				    	tc_cnt= ini_time+dtini/60.0*real(timestep-1) !*[min]
-                        lateralFlow(i, timestep, j)= intp_y(nts_ql_g, tarr_ql, varr_ql, tc_cnt)
+				    	!* 1. linear interpolation between qlat_g values
+!				    	do n=1,nts_ql_g
+!				    	    varr_ql(n)= qlat_g(n,i,j) !* qlat_g(n,i,j) in unit of m2/sec
+!				    	enddo
+!				    	tc_cnt= ini_time+dtini/60.0*real(timestep-1) !*[min]
+!                        lateralFlow(i, timestep, j)= intp_y(nts_ql_g, tarr_ql, varr_ql, tc_cnt)
+                        !* 2. stair case form of qlat_g (i.e., constant qlat over 60 min window)
+                        tc_cnt= ini_time+dtini/60.0*real(timestep-1) !*[min]
+                        idxql= locate(tarr_ql,tc_cnt)
+                        if (idxql.lt.1) idxql=1
+                        if (idxql.gt.nts_ql_g) idxql=nts_ql_g
+                        lateralFlow(i, timestep, j)= qlat_g(idxql,i,j)
                     enddo
+                    !* test start
+!                    tc_cnt= ini_time+real(timestep-1)*dtini/60.
+!                    write(10, *) tc_cnt, j, (lateralFlow(i,timestep,j), i=1, ncomp-1)
+                    !* test end
+
          			!* head water reach
                     !if (frnw_g(j,3)==0) then
                         newQ(1,timestep,j) = newQ(1,timestep,j)+lateralFlow(1,timestep,j)*dx(1,j)
@@ -432,11 +444,7 @@ contains
 !                    print*, "time", j, timestep, dtini, ini_time, tc_cnt
 				enddo !* do timestep=1, ntim
 				!lateralFlow(1,:,j) = 0.       ! lateral flow at i = 1 is already added
-				!* test
-!                do timestep = 1,repeatInterval,saveFrequency
-!                    tc_cnt= ini_time+real(timestep-1)*dtini/60.
-!                    write(10, *) tc_cnt, j, (lateralFlow(i,timestep,j), i=1, 3)
-!                end do
+
 				! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 				! Diffusive wave forward sweep to calculate flow at t+1
 				! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
