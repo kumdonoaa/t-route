@@ -3,7 +3,7 @@ module constants_module
     implicit none
     save
 
-    real, parameter :: grav = 9.81
-    real, parameter :: TOLERANCE = 1e-8
+    double precision, parameter :: grav = 9.81
+    double precision, parameter :: TOLERANCE = 1e-8
 
 end module constants_module

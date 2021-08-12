@@ -30,9 +30,7 @@ contains
         allocate(topwTable(nel))
         allocate(nwi1Table(nel))
         allocate(dPdATable(nel))
-
         allocate(skkkTable(nel))
-
 		allocate(ncompElevTable(nel))
         allocate(ncompAreaTable(nel))
 ! only in version 2 20151115
