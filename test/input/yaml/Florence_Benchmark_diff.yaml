@@ -1,7 +1,7 @@
 ---
 # Initial input parameters
 run_parameters:
-    compute_kernel: "diffusive"
+    compute_kernel: "diffusive_cnt"
     parallel_compute_method: None
     verbose: true
     showtiming: true
@@ -10,8 +10,8 @@ run_parameters:
     subnetwork_target_size: 100
     qts_subdivisions: 12
     return_courant: false
-    dt: 300
-    nts: 24
+    dt: 600
+    nts: 4308 
     cpu_pool: 12
     #Use the parallel computation engine (omit flag for serial computation)
     #Verbose output (leave blank for quiet output)

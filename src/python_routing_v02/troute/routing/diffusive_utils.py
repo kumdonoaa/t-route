@@ -454,12 +454,12 @@ def diffusive_input_data_v02(
     """
 
     # diffusive time steps info.
-    dt = 300 # seconds
-    dt_ql_g = dt * qts_subdivisions
-    dt_ub_g = dt * qts_subdivisions # TODO: make this timestep the same as the simulation timestep
-    dt_db_g = dt * qts_subdivisions # TODO: make this timestep the same as the simulation timestep
+    dt = 600 # seconds
+    dt_ql_g = 3600.0 # qlateral data time step in [sec] #dt * qts_subdivisions
+    dt_ub_g = dt_ql_g #dt * qts_subdivisions # TODO: make this timestep the same as the simulation timestep
+    dt_db_g = 900 # usgs real-time publish time step [sec] #dt * qts_subdivisions # TODO: make this timestep the same as the simulation timestep
     saveinterval_cnx = dt
-    saveinterval_cnt = dt * 12
+    saveinterval_cnt = dt * 6
     dtini_g = dt
     t0_g = 0.0  # simulation start hr **set to zero for Fortran computation
     tfin_g = (dt * nsteps)/60/60
@@ -624,6 +624,7 @@ def diffusive_input_data_v02(
     # ---------------------------------------------------------------------------------
     iniq = np.zeros((mxncomp_g, nrch_g))
     frj = -1
+    #import pdb; pdb.set_trace()
     for x in range(mx_jorder, -1, -1):
         for head_segment, reach in ordered_reaches[x]:
             seg_list = reach["segments_list"]
@@ -636,15 +637,18 @@ def diffusive_input_data_v02(
                     segID = seg_list[seg]
                     
                 idx_segID = np.where(geo_index == segID)
-                iniq[seg, frj] = initial_conditions[idx_segID, 0]
-                
+                #iniq[seg, frj] = initial_conditions[idx_segID, 0]
+                iniq[seg, frj] = 0.5
+    
+    
     # ---------------------------------------------------------------------------------
     #                              Step 0-7
 
     #                  Prepare lateral inflow data
     # ---------------------------------------------------------------------------------
+    #import pdb; pdb.set_trace()
     nts_ql_g = (
-        int((tfin_g - t0_g) * 3600.0 / dt_ql_g)
+        int((tfin_g - t0_g) * 3600.0 / dt_ql_g)+1
     )  # the number of the entire time steps of lateral flow data
 
     qlat_g = np.zeros((nts_ql_g, mxncomp_g, nrch_g))
@@ -746,7 +750,7 @@ def diffusive_input_data_v02(
     diff_ins["ufhlt_f_g"] = ufhlt_f_g
     diff_ins["ufqlt_f_g"] = ufqlt_f_g
     diff_ins["frnw_col"] = frnw_col
-    diff_ins["frnw_g"] = frnw_g
+    diff_ins["frnw_g"] = dfrnw_g
     diff_ins["qlat_g"] = qlat_g
     diff_ins["ubcd_g"] = ubcd_g
     diff_ins["dbcd_g"] = dbcd_g
