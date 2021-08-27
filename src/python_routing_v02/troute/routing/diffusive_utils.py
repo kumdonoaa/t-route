@@ -455,7 +455,7 @@ def diffusive_input_data_v02(
 
     # diffusive time steps info.
     dt = 600 # seconds
-    dt_ql_g = 3600.0 # qlateral data time step in [sec] #dt * qts_subdivisions
+    dt_ql_g = dt*qts_subdivisions    
     dt_ub_g = dt_ql_g #dt * qts_subdivisions # TODO: make this timestep the same as the simulation timestep
     dt_db_g = 900 # usgs real-time publish time step [sec] #dt * qts_subdivisions # TODO: make this timestep the same as the simulation timestep
     saveinterval_cnx = dt
@@ -637,8 +637,8 @@ def diffusive_input_data_v02(
                     segID = seg_list[seg]
                     
                 idx_segID = np.where(geo_index == segID)
-                #iniq[seg, frj] = initial_conditions[idx_segID, 0]
-                iniq[seg, frj] = 0.5
+                iniq[seg, frj] = initial_conditions[idx_segID, 0]
+                
     
     
     # ---------------------------------------------------------------------------------
@@ -708,8 +708,7 @@ def diffusive_input_data_v02(
     ufqlt_f_g = np.zeros((mxncomp_g, nrch_g, nhincr_f_g))
     ufhlt_f_g = np.zeros((mxncomp_g, nrch_g, nhincr_f_g))
 
-    # TODO: Call uniform flow lookup table creation kernel
-
+    # TODO: Call uniform flow lookup table creation kernel    
     # ---------------------------------------------------------------------------------
     #                              Step 0-11
 

@@ -120,14 +120,6 @@ contains
         integer :: ndata, idmy1, nts_db_g2, idxql
         double precision :: slope, y_norm, area_n, temp, tc_cnt, rmnd, saveinterval_min
 
-        open(unit=11,file="./temp_test/q elv.txt",status='unknown')
-!        open(unit=10, file="./output/any_adam.txt", status='unknown')
-!        open(unit=8, file="./output/output_wl_adam.txt", status='unknown')
-!        open(unit=9, file="./output/q_adam.txt", status='unknown')
-        !open(unit=12, file="./temp_test/newQ initial.txt", status='unknown')
-        open(unit=13, file="./temp_test/qlat.txt", status='unknown')
-
-
 		! simulation timestep
         dtini=dtini_g  !*[sec]
         dtini_given=dtini
@@ -165,8 +157,6 @@ contains
 
         minDiffuLm= 50.0
         maxDiffuLm= 400.0
-
-	print*, dtini, t0, tfin, saveinterval, totaltimesteps, repeatinterval, ntim, nlinks, mxncomp 
 
         allocate(area(num_points))
         allocate(bo(num_points,totalChannels))
@@ -233,23 +223,11 @@ contains
         allocate(skLeft(num_points, totalChannels), skMain(num_points, totalChannels), skRight(num_points, totalChannels))
         allocate(currentSquareDepth(nel))
         allocate(ini_y(nlinks))
-        allocate(ini_q(nlinks))
         allocate(notSwitchRouting(nlinks))
         allocate(currentROutingDiffusive(nlinks))
         allocate(tarr_ql(nts_ql_g), varr_ql(nts_ql_g))
         allocate(tarr_ub(nts_ub_g), varr_ub(nts_ub_g))
         allocate(tarr_db(nts_db_g), varr_db(nts_db_g))
-
-  	do j=1, nlinks
-        ncomp=frnw_g(j,1)
-        do i=1, ncomp
-	idmy1=-1        
-	do n=1, nts_ql_g
-                idmy1= idmy1+1
-		write(13,*) j, i, idmy1*60, qlat_g(n,i,j) !* qlat_g(n,i,j) in [m^2/sec]
-        enddo
-        enddo
-    	enddo
 
 		! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 		! identify minimum dx (segment length) in the network
@@ -268,8 +246,7 @@ contains
 		z=z_ar_g
         !* test
         ini_y=0.05  !* [meter]
-        ini_q= 0.5 !0.5   !*[m^3/sec]
-
+  
         oldQ = -999; oldY = -999; newQ = -999; newY = -999
         dimensionless_Cr = -999; dimensionless_Fo = -999; dimensionless_Fi = -999
         dimensionless_Di = -999; dimensionless_Fc = -999; dimensionless_D = -999
@@ -299,7 +276,6 @@ contains
 									z_ar_g, bo_ar_g, traps_ar_g, tw_ar_g, twcc_ar_g)
 
 				oldY(i,j) = ini_y(j) + z(i,j)
-                !oldQ(i,j) = ini_q(j)
                 oldQ(i,j) = iniq(i,j)
             enddo
 		enddo
@@ -386,7 +362,6 @@ contains
 		! Define initial discharge conditons
         do j = 1, nlinks
             ncomp = frnw_g(j,1)
-            !ini_q_repeat(1:ncomp,j) = ini_q(j)
             do i=1,ncomp
 	    ini_q_repeat(i,j) = iniq(i,j)
 	    enddo        
@@ -588,14 +563,14 @@ contains
         10  format(f12.5 ,i6, 2200f14.4)
         11  format(f12.5 ,i6, 2200i6)
             !* test
-            do ts_ev = 1, int(tfin_g*3600.0/saveInterval)
-				do j=1,nlinks
-					ncomp = frnw_g(j,1)
-					do i=1, ncomp
-                        write(11,*) ts_ev,real(ts_ev-1)*saveInterval/60.0, i, j, q_ev_g(ts_ev, i, j), elv_ev_g(ts_ev, i, j)
-					end do
-				end do
-			end do
+!            do ts_ev = 1, int(tfin_g*3600.0/saveInterval)
+!				do j=1,nlinks
+!					ncomp = frnw_g(j,1)
+!					do i=1, ncomp
+!                        write(11,*) ts_ev,real(ts_ev-1)*saveInterval/60.0, i, j, q_ev_g(ts_ev, i, j), elv_ev_g(ts_ev, i, j)
+!					end do
+!				end do
+!			end do
 
         deallocate(frnw_g)
         deallocate(area, bo, pere, areap, qp, z, dqp, dqc, dap, dac, depth, sk, co, dx)
@@ -608,7 +583,7 @@ contains
         deallocate(elevTable, areaTable, pereTable, rediTable, convTable, topwTable)
         deallocate( skkkTable, nwi1Table, dPdATable, ncompElevTable, ncompAreaTable)
         deallocate(xsec_tab, rightBank, leftBank, skLeft, skMain, skRight)
-        deallocate(currentSquareDepth, ini_y, ini_q, notSwitchRouting, currentROutingDiffusive )
+        deallocate(currentSquareDepth, ini_y, notSwitchRouting, currentROutingDiffusive )
         deallocate(tarr_ql, varr_ql, tarr_ub, varr_ub)
         deallocate(ini_q_repeat, ini_E, ini_F, added_Q, velocity)
 

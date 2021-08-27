@@ -8,7 +8,7 @@ run_parameters:
     debuglevel: 1
     assume_short_ts: true
     subnetwork_target_size: 100
-    qts_subdivisions: 12
+    qts_subdivisions: 6
     return_courant: false
     dt: 600
     nts: 4308 
