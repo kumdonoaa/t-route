@@ -793,30 +793,30 @@ def unpack_output(pynw, ordered_reaches, out_q, out_elv):
         for rch in ordered_reaches[o]:
 
             rch_segs = rch[1]["segments_list"]
-            rch_list.extend(rch_segs)
+            rch_list.extend(rch_segs[:-1])
 
             j = reach_heads.index(rch[0])
 
             if i == 1:
-                dat_all = np.empty((len(rch_segs), nts * 3))
+                dat_all = np.empty((len(rch_segs)-1, nts * 3))
                 dat_all[:] = np.nan
                 # flow result
-                dat_all[:, ::3] = np.transpose(np.array(out_q[:, 0 : len(rch_segs), j]))
+                dat_all[:, ::3] = np.transpose(np.array(out_q[:, 1 : len(rch_segs), j]))
                 # elevation result
                 dat_all[:, 2::3] = np.transpose(
-                    np.array(out_elv[:, 0 : len(rch_segs), j])
+                    np.array(out_elv[:, 1 : len(rch_segs), j])
                 )
 
             else:
-                dat_all_c = np.empty((len(rch_segs), nts * 3))
+                dat_all_c = np.empty((len(rch_segs)-1, nts * 3))
                 dat_all_c[:] = np.nan
                 # flow result
                 dat_all_c[:, ::3] = np.transpose(
-                    np.array(out_q[:, 0 : len(rch_segs), j])
+                    np.array(out_q[:, 1 : len(rch_segs), j])
                 )
                 # elevation result
                 dat_all_c[:, 2::3] = np.transpose(
-                    np.array(out_elv[:, 0 : len(rch_segs), j])
+                    np.array(out_elv[:, 1 : len(rch_segs), j])
                 )
                 # concatenate
                 dat_all = np.concatenate((dat_all, dat_all_c))
