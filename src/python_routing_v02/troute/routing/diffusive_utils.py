@@ -428,7 +428,8 @@ def diffusive_input_data_v02(
     initial_conditions,
     upstream_results,
     qts_subdivisions,
-    nsteps
+    nsteps,
+    dt
 ):
     """
     Build input data objects for diffusive wave model
@@ -454,14 +455,14 @@ def diffusive_input_data_v02(
     """
 
     # diffusive time steps info.
-    dt_ql_g = geo_data[0,0] * qts_subdivisions
-    dt_ub_g = geo_data[0,0] * qts_subdivisions # TODO: make this timestep the same as the simulation timestep
-    dt_db_g = geo_data[0,0] * qts_subdivisions # TODO: make this timestep the same as the simulation timestep
-    saveinterval_g = geo_data[0,0]
-    saveinterval_ev_g = geo_data[0,0]
-    dtini_g = geo_data[0,0]
+    dt_ql_g = dt * qts_subdivisions
+    dt_ub_g = dt * qts_subdivisions # TODO: make this timestep the same as the simulation timestep
+    dt_db_g = dt * qts_subdivisions # TODO: make this timestep the same as the simulation timestep
+    saveinterval_g = dt
+    saveinterval_ev_g = dt
+    dtini_g = dt
     t0_g = 0.0  # simulation start hr **set to zero for Fortran computation
-    tfin_g = (geo_data[0,0] * nsteps)/60/60
+    tfin_g = (dt * nsteps)/60/60
     
     # USGS data related info.
     usgsID = diffusive_parameters.get("usgsID", None)
