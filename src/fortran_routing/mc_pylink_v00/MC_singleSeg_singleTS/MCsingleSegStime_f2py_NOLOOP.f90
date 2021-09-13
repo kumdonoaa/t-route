@@ -182,6 +182,12 @@ subroutine muskingcungenwm(dt, qup, quc, qdp, ql, dx, bw, tw, twcc,&
     ! *************************************************************
     call courant(h, bfd, bw, twcc, ncc, s0, n, z, dx, dt, ck, cn)
     !print*, "deep down", depthc
+    
+    ! **************************************************
+    ! storage at current time t for water balance check
+    ! **************************************************  
+    !*X now takes storage volumn of a given segment at current time t.    
+    call storage(depthc, bfd, bw, twcc, z, dx, X)
 
 end subroutine muskingcungenwm
 
@@ -434,6 +440,28 @@ subroutine hydraulic_geometry(h, bfd, bw, twcc, z, &
     endif
 
 end subroutine hydraulic_geometry
+!**---------------------------------------------------**!
+!*                                                     *!
+!*           segment storage SUBROUTINE                *!
+!*                                                     *!
+!**---------------------------------------------------**
+subroutine storage(h, bfd, bw, twcc, z, dx, X)
 
+    implicit none
+    real(prec), intent(in) :: h, bfd, bw, twcc, z, dx
+    real(prec), intent(out) :: X
+    real(prec) :: areac, areac_cc
+
+    if (h.gt.bfd) then !* h is a finally computed depth at current time t.
+    	areac = (bw + bfd*z)*bfd
+	areac_cc = twcc*(h - bfd)
+    else
+	areac = (bw + h*z)*h
+	areac_cc =0.0_prec
+    endif
+    !* storage volumn [m3] at current time t for the given segment 
+    X = (areac + areac_cc)*dx !*<- X is now used for storage volumn of a given segment.
+
+end subroutine storage
 
 end module muskingcunge_module
