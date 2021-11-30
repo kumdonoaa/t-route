@@ -467,8 +467,8 @@ def diffusive_mainstem_input_data_v01(
     dt_ql_g = 3600 #dt * qts_subdivisions    # lateral inflow timestep (sec)    
     dt_ub_g = 3600 #dt    # upstream boundary condition timestep (sec)    
     dt_db_g = 3600 #dt * qts_subdivisions    # downstream boundary condition timestep (sec)    
-    saveinterval_tu = dt    # time interval at which flow and depth simulations are written out by Tulane diffusive model    
-    saveinterval_cnt = dt * qts_subdivisions    # time interval at which depth is written out by cnt model
+    saveinterval_tu = 60.0    # time interval at which flow and depth simulations are written out by Tulane diffusive model    
+    saveinterval_cnt = 60.0 #dt * qts_subdivisions    # time interval at which depth is written out by cnt model
     dtini_g = dt    # simulation time step (for cn-mod, it changes but fixed for cnt and cnx)
     dt_qtrib_g = 60.0  #3600.0    #tributary (including mainstem upstream boundary) data time step [sec]
     t0_g = 0.0     # simulation start hr **set to zero for Fortran computation
@@ -481,7 +481,8 @@ def diffusive_mainstem_input_data_v01(
     #usgseDT = diffusive_parameters.get("usgs_end_date", None)
     #usgspCd = diffusive_parameters.get("usgs_parameterCd", None)
     
-    # store the time variable values in the above to an array
+    # CNX: store the time variable values in the above to an array
+    '''
     timestep_ar_g = np.zeros(8)
     timestep_ar_g[0]= dtini_g
     timestep_ar_g[1]= t0_g
@@ -491,14 +492,27 @@ def diffusive_mainstem_input_data_v01(
     timestep_ar_g[5]= dt_ub_g
     timestep_ar_g[6]= dt_db_g
     timestep_ar_g[7]= dt_qtrib_g   
-    
+    '''
+    # CN-mod: store the time variable values in the above to an array
+    timestep_ar_g = np.zeros(8)
+    timestep_ar_g[0]= dtini_g
+    timestep_ar_g[1]= t0_g
+    timestep_ar_g[2]= tfin_g
+    timestep_ar_g[3]= saveinterval_tu
+    timestep_ar_g[4]= dt_ql_g
+    timestep_ar_g[5]= dt_ub_g
+    timestep_ar_g[6]= dt_db_g
+    timestep_ar_g[7]= dt_qtrib_g   
+    #'''
     # diffusive parameters
     #cfl_g = diffusive_parameters.get("courant_number_upper_limit", None)
     #theta_g = diffusive_parameters.get("theta_parameter", None)
     #tzeq_flag_g = diffusive_parameters.get("chgeo_computation_flag", None)
     #y_opt_g = diffusive_parameters.get("water_elevation_computation_flag", None)
     #so_llm_g = diffusive_parameters.get("bed_slope_lower_limit", None) 
- 
+    
+    # CNX Parameters
+    '''   
     paradim=6 
     para_ar_g= np.zeros(paradim)
     para_ar_g[0]= 0.95 #lower limit of Courant number.
@@ -507,6 +521,23 @@ def diffusive_mainstem_input_data_v01(
     para_ar_g[3]= 0.00001    # lower limit of channel bed slope.
     para_ar_g[4]= 12 # upper limit of the number of uniformly distributed sub-nodes, including ghost nodes, on each stream segment.
     para_ar_g[5]= 2  # number of sub-nodes added to existing uniformly distributed sub-nodes, used to provide adequate discharge downstream boundary condition. 
+    '''
+    # CN-mod parameters
+    paradim=10
+    para_ar_g= np.zeros(paradim)
+    para_ar_g[0]= 0.95    # Courant number (default: 0.95)
+    para_ar_g[1]= 0.5     # lower limit of celerity (default: 0.5)
+    para_ar_g[2]= 50.0    # lower limit of diffusivity (default: 50)
+    para_ar_g[3]= 5000.0  # upper limit of diffusivity (default: 1000)
+    para_ar_g[4]= -15.0   # lower limit of dimensionless diffusivity, used to determine b/t normal depth and diffusive depth
+    para_ar_g[5]= -10.0   #upper limit of dimensionless diffusivity, used to determine b/t normal depth and diffusive depth
+    para_ar_g[6]= 1.0     # 0:run Bisection to compute water level; 1: Newton Raphson (default: 1.0)
+    para_ar_g[7]= 0.02831   # lower limit of discharge (default: 0.02831 cms)
+    para_ar_g[8]= 0.0001    # lower limit of channel bed slope (default: 0.0001)
+    para_ar_g[9]= 1.0     # weight in numerically computing 2nd derivative: 0: explicit, 1: implicit (default: 1.0)
+    #'''    
+
+    
 
     # number of reaches in network
     nrch_g = len(reach_list)
