@@ -668,18 +668,17 @@ contains
                         q_ev_g(ts_ev+1, i, j)= newQ(i,j)
                         elv_ev_g(ts_ev+1, i, j)= newY(i,j)
                     enddo
+                    !* water elevation for tributary/mainstem upstream boundary at a junction point
+                    do k=1, frnw_g(j,3) !* then number of upstream reaches
+                        usrchj= frnw_g(j,3+k) !* js corresponding to upstream reaches
+                        if (all(mstem_frj/=usrchj)) then
+                            !* tributary upstream reach or mainstem upstream boundary reach
+                            wdepth= newY(1,j) - z(1,j)
+                            elv_ev_g(ts_ev+1, frnw_g(usrchj,1), usrchj)= newY(1,j)
+                            elv_ev_g(ts_ev+1, 1, usrchj)= wdepth + z(1, usrchj)!* test only
+                        endif
+                    enddo
                 enddo
-                !* water elevation for tributary/mainstem upstream boundary at a junction point
-                do k=1, frnw_g(j,3) !* then number of upstream reaches
-                    usrchj= frnw_g(j,3+k) !* js corresponding to upstream reaches
-                    if (all(mstem_frj/=usrchj)) then
-                        !* tributary upstream reach or mainstem upstream boundary reach
-                        wdepth= newY(1,j) - z(1,j)
-                        elv_ev_g(ts_ev+1, frnw_g(usrchj,1), usrchj)= newY(1,j)
-                        elv_ev_g(ts_ev+1, 1, usrchj)= wdepth + z(1, usrchj)!* test only
-                    endif
-                enddo
-
                 ts_ev=ts_ev+1
             end if
 
@@ -694,16 +693,16 @@ contains
                         elv_ev_g(1, i, j)= oldY(i,j)
                         !write(101,"(F8.1, 2I10, 3F20.4)") t,i,j,newQ(i,j),newY(i,j)-z(i,j), newY(i,j)
                     enddo
-                enddo
-                !* water elevation for tributary/mainstem upstream boundary at a junction point
-                do k=1, frnw_g(j,3) !* then number of upstream reaches
-                    usrchj= frnw_g(j,3+k) !* js corresponding to upstream reaches
-                    if (all(mstem_frj/=usrchj)) then
-                        !* tributary upstream reach or mainstem upstream boundary reach
-                        wdepth= oldY(1,j) - z(1,j)
-                        elv_ev_g(1, frnw_g(usrchj,1), usrchj)= oldY(1,j)
-                        elv_ev_g(1, 1, usrchj)= wdepth + z(1, usrchj)!* test only
-                    endif
+                    !* water elevation for tributary/mainstem upstream boundary at a junction point
+                    do k=1, frnw_g(j,3) !* then number of upstream reaches
+                        usrchj= frnw_g(j,3+k) !* js corresponding to upstream reaches
+                        if (all(mstem_frj/=usrchj)) then
+                            !* tributary upstream reach or mainstem upstream boundary reach
+                            wdepth= oldY(1,j) - z(1,j)
+                            elv_ev_g(1, frnw_g(usrchj,1), usrchj)= oldY(1,j)
+                            elv_ev_g(1, 1, usrchj)= wdepth + z(1, usrchj)!* test only
+                        endif
+                    enddo
                 enddo
             end if
 
