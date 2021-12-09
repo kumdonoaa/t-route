@@ -1006,6 +1006,7 @@ def compute_nhd_routing_v02(
 
             reaches_list_with_type = _build_reach_type_list(reach_list, wbodies_segs)
 
+
             # qlat_sub = qlats.loc[common_segs].sort_index()
             # q0_sub = q0.loc[common_segs].sort_index()
             qlat_sub = qlats.loc[param_df_sub.index]

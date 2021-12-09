@@ -453,7 +453,7 @@ def diffusive_input_data_v02(
     -------
     diff_ins -- (dict) formatted inputs for diffusive wave model
     """
-    
+
     # lateral inflow timestep (sec)
     dt_ql_g = dt * qts_subdivisions
     # upstream boundary condition timestep (sec)
@@ -483,6 +483,7 @@ def diffusive_input_data_v02(
     tzeq_flag_g = diffusive_parameters.get("chgeo_computation_flag", None)
     y_opt_g = diffusive_parameters.get("water_elevation_computation_flag", None)
     so_llm_g = diffusive_parameters.get("bed_slope_lower_limit", None)
+    
 
     # number of reaches in network
     nrch_g = len(reach_list)
@@ -538,6 +539,9 @@ def diffusive_input_data_v02(
     
     jorder_reaches = sorted(tr, key=lambda x: x[0])
     mx_jorder = max(jorder_reaches)[0]  # maximum junction order of subnetwork of TW
+    
+    print(f'jorder_reaches: {jorder_reaches}')
+    
 
     ordered_reaches = {}
     rchhead_reaches = {}
@@ -584,7 +588,8 @@ def diffusive_input_data_v02(
         # cahnnel geometry data
         a = np.where(geo_cols == "cs")
         geo_data[:, a] = 1.0 / geo_data[:, a]
-
+    
+    #import pdb; pdb.set_trace()
     # --------------------------------------------------------------------------------------
     #                                 Step 0-3
     #    Adjust altitude so that altitude of the last sement of a reach is equal to that
@@ -595,7 +600,7 @@ def diffusive_input_data_v02(
     adj_alt1(
         mx_jorder, ordered_reaches, geo_cols, geo_index, geo_data, dbfksegID, z_all
     )
-
+    
     # --------------------------------------------------------------------------------------
     #                                 Step 0-4
     #     Make Fortran-Python channel network mapping variables.
@@ -619,7 +624,7 @@ def diffusive_input_data_v02(
     for j in range(0, nrch_g):
         for col in range(0, frnw_col):
             dfrnw_g[j, col] = float(frnw_g[j, col])
-
+    #breakpoint()
     # ---------------------------------------------------------------------------------
     #                              Step 0-5
     #                  Prepare channel geometry data

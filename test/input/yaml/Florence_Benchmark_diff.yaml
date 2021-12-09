@@ -7,8 +7,8 @@
 ---
 # Initial input parameters
 run_parameters:
-#     compute_kernel: "diffusive"
-    compute_kernel: "diffusive_cnx"
+    compute_kernel: "V02-structured" #"diffusive_cnt"
+    #compute_kernel: "diffusive_cnt"
     parallel_compute_method: None
     verbose: true
     showtiming: true
@@ -16,7 +16,7 @@ run_parameters:
     assume_short_ts: true
     subnetwork_target_size: 100
     qts_subdivisions: 12
-    return_courant: false
+    return_courant: true
     # NOTE: diffusive_cnt does not work with dt < 600 secs
     dt: 300
     nts: 8616 
@@ -44,6 +44,7 @@ supernetwork_parameters:
     title_string: cnt_test
     geo_file_path: "../../test/input/florence_933020089/DOMAIN/Route_Link.nc"
     mask_file_path: "../../test/input/geo/Channels/masks/933020089_mask.csv"
+    #mask_file_path: "../../test/input/geo/Channels/masks/mountain_creek.txt"
     mask_layer_string: ""
     mask_driver_string: "csv"
     mask_key: 0

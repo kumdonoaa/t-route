@@ -37,6 +37,7 @@ subroutine muskingcungenwm(dt, qup, quc, qdp, ql, dx, bw, tw, twcc,&
     ! qdc = 0.0
     ! velc = velp
     ! depthc = depthp
+    open(unit=1, file="./mc courant test.txt")
 
     !* parameters of Secant method
     maxiter  = 100
@@ -182,6 +183,7 @@ subroutine muskingcungenwm(dt, qup, quc, qdp, ql, dx, bw, tw, twcc,&
     ! *************************************************************
     call courant(h, bfd, bw, twcc, ncc, s0, n, z, dx, dt, ck, cn)
     !print*, "deep down", depthc
+    write(1,*) ck, cn
 
 end subroutine muskingcungenwm
 
