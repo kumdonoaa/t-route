@@ -633,7 +633,7 @@ def diffusive_input_data_v02(
 #             upstream_flow_array[j,0] = us_iniq
     
     # Order reaches by junction depth
-    path_func = partial(nhd_network.split_at_junction, rconn)
+    path_func = partial(nhd_network.split_at_waterbodies_and_junctions, set(junction_inflows.index.to_list()),rconn)
     tr = nhd_network.dfs_decomposition_depth_tuple(rconn, path_func)    
     
     jorder_reaches = sorted(tr, key=lambda x: x[0])
