@@ -196,10 +196,11 @@ def nwm_network_preprocess(
             # diffusive domain connections object
             diffusive_network_data[tw]['connections'] = {k: connections[k] for k in (diffusive_domain[tw] + trib_segs)}
             
-            # diffusive domain reaches and upstream connections
+            # diffusive domain reaches and upstream connections. 
+            # break network at tributary segments
             _, reaches, rconn_diff = nnu.organize_independent_networks(
                 diffusive_network_data[tw]['connections'],
-                set(),
+                set(trib_segs),
             )
             diffusive_network_data[tw]['rconn'] = rconn_diff
             diffusive_network_data[tw]['reaches'] = reaches[tw]
