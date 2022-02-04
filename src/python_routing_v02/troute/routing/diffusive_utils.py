@@ -390,13 +390,8 @@ def fp_dbcd_map(usgsID2tw=None, usgssDT=None, usgseDT=None, usgspCd=None):
 def fp_naturalxsec_map(
                 ordered_reaches,
                 mainstem_headseg_list, 
-                #inland_bathyNC, 
-                #comid_bathy, 
                 topobathy_data_bytw,
                 param_df, 
-               #geo_index, 
-                #geo_cols, 
-                #geo_data, 
                 mx_jorder, 
                 mxncomp_g, 
                 nrch_g,
