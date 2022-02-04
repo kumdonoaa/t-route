@@ -403,8 +403,8 @@ def fp_naturalxsec_map(
     ----------
     ordered_reaches -- (dict) reaches and reach metadata by junction order
     mainstem_headseg_list -- (int) a list of link IDs of headsegs of related mainstem reaches 
-    inland_bathyNC --  bathymetry NC data of channel cross section
-    geo_index -- (ndarray of int64s) row indices for geomorphic parameters data array (geo_data)
+    topobathy_data_bytw --  
+    param_df --
     mx_jorder -- (int) max junction order
     mxncomp_g -- (int) maximum number of nodes in a reach
     nrch_g -- (int) number of reaches in the network
