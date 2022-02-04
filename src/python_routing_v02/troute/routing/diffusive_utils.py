@@ -417,109 +417,87 @@ def fp_naturalxsec_map(
     z_bathy_g -- (numpy of float64s) elevation of bathy data points
     size_bathy_g -- (integer) the nubmer of bathy data points of each cross section
     mxnbathy_g -- (integer) maximum size of bathy data points
-    """    
-    # take only related data from bathy NC file
-#    inland_bathyDF = pd.DataFrame()
-#    inland_bathyDF['comid'] =  pd.DataFrame(np.ma.filled(inland_bathyNC['comid'][:]))
-    # this is lateral distance from x=0 where the NWM line crosses the cross section later line. 
-    # For left side of x=0 (when looking upstream-to-downstream), the lateral distance takes negative values 
-    # for left side of main channel or left floodplains whiel positive for right side of main ch. or right floodplains.
-#    inland_bathyDF['x_bathy'] =  pd.DataFrame(np.ma.filled(inland_bathyNC['xid_d'][:]))
-#    inland_bathyDF['z_bathy'] =   pd.DataFrame(np.ma.filled(inland_bathyNC['z'][:]))
-#    inland_bathyDF['n'] =   pd.DataFrame(np.ma.filled(inland_bathyNC['n'][:]))
     
-    # find maximum size of x or z bathy data
-#    sizelist=[]
-#    ncomid= len(comid_bathy)
-#    for i in range(0,ncomid): # for bathy data of arbitarily selected three segments
-#        inland_bathyDF_subset = inland_bathyDF[inland_bathyDF['comid'] == comid_bathy[i]]    
-#        size= inland_bathyDF_subset['x_bathy'].size
-#        sizelist.append(size)
+    Notes
+    -----
+    - In node-configuration, bottom node takes bathy of the first segment of the downtream reach
+      except TW reach where the bottom node bathy is interpolated by bathy of the last segment 
+      with so*0.5*dx 
+    """  
     
-    sizelist = []
-    for i in range(0, topobathy_data_bytw.index.unique().size):
-        size =  topobathy_data_bytw.loc[segID].size
-        sizelist.append(size)
-    mxnbathy_g=max(sizelist)
+    if not topobathy_data_bytw.empty:
+        
+        # maximum number of stations along a single cross section
+        mxnbathy_g = topobathy_data_bytw.index.value_counts().max()
 
-    x_bathy_g = np.zeros((mxnbathy_g, mxncomp_g, nrch_g))
-    z_bathy_g = np.zeros((mxnbathy_g, mxncomp_g, nrch_g))
-    mann_bathy_g = np.zeros((mxnbathy_g, mxncomp_g, nrch_g))
-    size_bathy_g= np.zeros((mxncomp_g, nrch_g), dtype='int32')    
-   
-    frj = -1
-    for x in range(mx_jorder, -1, -1):
-        for head_segment, reach in ordered_reaches[x]:
-            seg_list = reach["segments_list"]
-            ncomp = reach["number_segments"]
-            frj = frj + 1
-            headsegID= seg_list[0]                  
-    ## **** for now, bathy data here doesn't cover Cape fear river we're experimenting with. So, we picked
-    ## **** arbitrarily three comid from the bathy NC data and get the bathy data to pass to three segments
-    ## **** we're considering now. Basically, three mainstem reaches with each having only one segment.                
-            if mainstem_headseg_list.count(headsegID) > 0:  
-                # when selected segID is mainstem:
-                #import pdb; pdb.set_trace()                   
-                for seg in range(0,ncomp):
-                    if seg==ncomp-1 and x > 0:
-                        #In node-configuration, bottom node takes bathy of the first segment of the downtream reach
-                        # except TW reach where the bottom node bathy is interpolated by bathy of the last segment 
-                        # with so*0.5*dx of 
-                        segID= reach["downstream_head_segment"]
-                    else:
-                        # In node configuration, for example, for 2 segments of a reach, 
-                        # 1st node(=top node) takes bathy of the first segment and
-                        # 2nd node takes bathy of the second segment
-                        # 3rd node takes bathy of, as explained right above, the firt segment 
-                        segID= seg_list[seg]
-                    
-                     ## **** all hypothetical coding
-                  #  if x==2 and seg==0:
-                  #      idx_comid=0
-                  #  if x==2 and seg==1:
-                  #      idx_comid=1                        
-                  #  if x==1 and seg==0:
-                  #      idx_comid=1
-                  #  if x==1 and seg==1:
-                  #      idx_comid=2
-                  #  if x==0 and seg==0:
-                  #      idx_comid=2
-                  #  if x==0 and seg==1:
-                        #when tail water node, z_bathy will be adjusted by so*dx of related segment
-                  #      idx_comid=2                                      
-                    
-                    #inland_bathyDF_subset = inland_bathyDF[inland_bathyDF['comid'] == comid_bathy[idx_comid]]
-                    #size_bathy_g[seg, frj]= inland_bathyDF_subset['x_bathy'].size
-                    size_bathy_g[seg, frj] = topobathy_data_bytw.loc[segID].size
-                    
-                    #for idp in range(0, size_bathy_g[seg, frj]):
-                    for idp in range(0, len(topobathy_data_bytw.loc[segID])):
-                        #x_bathy_g[idp, seg, frj]  = inland_bathyDF_subset [['x_bathy']].iloc[idp]
-                        #z_bathy_g[idp, seg, frj] =  inland_bathyDF_subset [['z_bathy']].iloc[idp]
-                        #mann_bathy_g[idp, seg, frj] = inland_bathyDF_subset [['n']].iloc[idp]
-                        x_bathy_g[idp, seg, frj]  = topobathy_data_bytw.loc[segID].xid_d[idp]
-                        z_bathy_g[idp, seg, frj] = topobathy_data_bytw.loc[segID].z[idp]
-                        mann_bathy_g[idp, seg, frj] = topobathy_data_bytw.loc[segID].n[idp]
+        # initialize arrays to store cross section data
+        x_bathy_g    = np.zeros((mxnbathy_g, mxncomp_g, nrch_g))
+        z_bathy_g    = np.zeros((mxnbathy_g, mxncomp_g, nrch_g))
+        mann_bathy_g = np.zeros((mxnbathy_g, mxncomp_g, nrch_g))
+        size_bathy_g = np.zeros((mxncomp_g, nrch_g), dtype='int32')    
+
+        # loop over reach orders.
+        for frj, x in enumerate(range(mx_jorder, -1, -1)):
+
+            # loop through all reaches of order x
+            for head_segment, reach in ordered_reaches[x]:
+
+                # list of segments in this reach
+                seg_list = reach["segments_list"]
+
+                # number of segments in this reach
+                ncomp = reach["number_segments"]
+
+                # determine if this reach is part of the mainstem diffusive domain
+                if head_segment in mainstem_headseg_list: 
+
+                    # loop through segments in mainstem reach
+                    for seg, segID in enumerate(seg_list):
+
+                        # identify the index in topobathy dataframe that contains
+                        # the data we want for this node.
+                        if seg == ncomp-1 and x > 0: 
+                            
+                            # if last node of a reach, but not the last node in the network
+                            # use cross section of downstream neighbor
+                            seg_idx = reach["downstream_head_segment"][0]
+
+                        elif segID == dbfksegID:
+                            
+                            # if last node of reach AND last node in the network,
+                            # use cross section of upstream neighbor
+                            seg_idx = seg_list[seg-1]
+                            
+                        else:
+                            seg_idx = segID
+                            
+                        # how many stations are in the node cross section?
+                        nstations = len(topobathy_data_bytw.loc[seg_idx])
                         
+
+                        # populate cross section size (# of stations) array
+                        size_bathy_g[seg, frj] = nstations
                         
-                if seg == ncomp - 1 and seg_list.count(dbfksegID) > 0:
-                    # At tailwater bottom node (as # of segment = # node +1), z_bathy need to be adjusted by so*dx of the last segment
-                    segID2 = seg_list[seg - 1]
-                    #idx_segID2 = np.where(geo_index == segID2)
-                    #idx_so = np.where(geo_cols == "s0")
-                    #idx_dx = np.where(geo_cols == "dx")
-                    idx_segID2 = np.where(param_df.index.values == segID2)
-                    idx_so = np.where(param_df.columns.values == "s0")
-                    idx_dx = np.where(param_df.columns.values == "dx")
-                    
-                    #So = geo_data[idx_segID2, idx_so]
-                    #dx = geo_data[idx_segID2, idx_dx]
-                    So = param_df.values[idx_segID2, idx_so]
-                    dx = param_df.values[idx_segID2, idx_dx]
-                    
-                    for idp in range(0, size_bathy_g[seg, frj]):
-                        z_bathy_g[idp, seg, frj] = z_bathy_g[idp, seg, frj] - So * dx   
+                        # populate cross section x, z and mannings n arrays
+                        x_bathy_g[0:nstations, seg, frj]    = topobathy_data_bytw.loc[seg_idx].xid_d
+                        z_bathy_g[0:nstations, seg, frj]    = topobathy_data_bytw.loc[seg_idx].z
+                        mann_bathy_g[0:nstations, seg, frj] = topobathy_data_bytw.loc[seg_idx].n
+                        
+                        # if terminal node of the network, then adjust the cross section z data using
+                        # channel slope and length data
+                        if segID == dbfksegID:
+                            So = param_df.loc[seg_idx].s0
+                            dx = param_df.loc[seg_idx].dx
+                            z_bathy_g[0:nstations, seg, frj] = z_bathy_g[0:nstations, seg, frj] - So * dx   
    
+    else:
+        
+        # if the bathy dataframe is empty, then pass out empty arrays
+        x_bathy_g    = np.array([])
+        z_bathy_g    = np.array([])
+        mann_bathy_g = np.array([])
+        size_bathy_g = np.array([])
+    
     return x_bathy_g, z_bathy_g, mann_bathy_g, size_bathy_g, mxnbathy_g
 
 def diffusive_input_data_v02(
