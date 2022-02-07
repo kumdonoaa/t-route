@@ -25,15 +25,17 @@ def nwm_network_preprocess(
     hybrid_params = compute_parameters.get("hybrid_parameters", False)
     if hybrid_params:
         
-        domain_file = hybrid_params.get("diffusive_domain", None)
-        topobathy_file = hybrid_params.get("topobathy_domain", None) # path to topobathy file
+        domain_file    = hybrid_params.get("diffusive_domain",   None)
+        run_hybrid     = hybrid_params.get('run_hybrid_routing', False)
+        topobathy_file = hybrid_params.get("topobathy_domain",   None)
+        use_topobathy  = hybrid_params.get('use_natl_xsections', False)
         
-        if domain_file:
+        if domain_file and run_hybrid:
             
             # read diffusive domain dictionary from yaml or json
             diffusive_domain = nhd_io.read_diffusive_domain(domain_file)
             
-            if topobathy_file:
+            if topobathy_file and use_topobathy:
                 
                 # read topobathy domain netcdf file, set index to 'comid'
                 # TODO: replace 'comid' with a user-specified indexing variable name.
@@ -60,7 +62,7 @@ def nwm_network_preprocess(
     else:
         diffusive_domain = None
         diffusive_network_data = None
-        topobathy_data = None
+        topobathy_data = pd.DataFrame()
 
     LOG.info("creating supernetwork connections set")
 

@@ -434,13 +434,15 @@ def fp_naturalxsec_map(
         x_bathy_g    = np.zeros((mxnbathy_g, mxncomp_g, nrch_g))
         z_bathy_g    = np.zeros((mxnbathy_g, mxncomp_g, nrch_g))
         mann_bathy_g = np.zeros((mxnbathy_g, mxncomp_g, nrch_g))
-        size_bathy_g = np.zeros((mxncomp_g, nrch_g), dtype='int32')    
+        size_bathy_g = np.zeros((mxncomp_g, nrch_g), dtype='i4')    
 
         # loop over reach orders.
-        for frj, x in enumerate(range(mx_jorder, -1, -1)):
+        frj = -1
+        for x in range(mx_jorder, -1, -1):
 
             # loop through all reaches of order x
             for head_segment, reach in ordered_reaches[x]:
+                frj = frj + 1
 
                 # list of segments in this reach
                 seg_list = reach["segments_list"]
@@ -493,10 +495,11 @@ def fp_naturalxsec_map(
     else:
         
         # if the bathy dataframe is empty, then pass out empty arrays
-        x_bathy_g    = np.array([])
-        z_bathy_g    = np.array([])
-        mann_bathy_g = np.array([])
-        size_bathy_g = np.array([])
+        x_bathy_g    = np.array([]).reshape(0,0,0)
+        z_bathy_g    = np.array([]).reshape(0,0,0)
+        mann_bathy_g = np.array([]).reshape(0,0,0)
+        size_bathy_g = np.array([], dtype = 'i4').reshape(0,0)
+        mxnbathy_g   = int(0)
     
     return x_bathy_g, z_bathy_g, mann_bathy_g, size_bathy_g, mxnbathy_g
 
@@ -833,13 +836,8 @@ def diffusive_input_data_v02(
     x_bathy_g, z_bathy_g, mann_bathy_g, size_bathy_g, mxnbathy_g = fp_naturalxsec_map(        
                                                                    ordered_reaches,                                             
                                                                    mainstem_headseg_list, 
-                                                                   #inland_bathyNC, 
-                                                                   #comid_bathy, 
                                                                    topobathy_data_bytw,
                                                                    param_df, 
-                                                                  #geo_index, 
-                                                                   #geo_cols, 
-                                                                   #geo_data, 
                                                                    mx_jorder,
                                                                    mxncomp_g, 
                                                                    nrch_g,

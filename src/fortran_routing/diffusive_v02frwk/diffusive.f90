@@ -363,15 +363,20 @@ contains
     
   !-----------------------------------------------------------------------------
   ! Build natural / systhetic cross sections and related hydraulic lookup table 
-  applyNaturalSection = 1
+  if (mxnbathy == 0) then
+    applyNaturalSection = 0
+  else
+    applyNaturalSection = 1
+  end if
   
   if (applyNaturalSection == 1) then
+  
     ! use bathymetry data 
     x_bathy    = x_bathy_g
     z_bathy    = z_bathy_g
     mann_bathy = mann_bathy_g
     size_bathy = size_bathy_g
-
+    
     do jm = 1, nmstem_rch !* mainstem reach only
       j = mstem_frj(jm)
       do i = 1, frnw_g(j, 1)
@@ -404,9 +409,9 @@ contains
                             rightBank(i,j), timesDepth, j, z_ar_g,   &
                             bo_ar_g, traps_ar_g, tw_ar_g, twcc_ar_g)
         end do
-    enddo
+    end do
   
-  endif  
+  end if  
   !-----------------------------------------------------------------------------
   ! Add uniform flow column to the hydraulic lookup table in order to avoid the 
   ! use of the trial-and-error iteration for solving normal depth
@@ -1752,7 +1757,7 @@ contains
 
         do ii = iel, iel_incr_start - 1
           conv1(ii) = conv1(iel-1) + pos_slope * (el1(ii) - el1(iel-1))
-        enddo
+        end do
 
         ! update dKdA accordingly
         do ii = iel, iel_incr_start - 1
