@@ -476,7 +476,6 @@ def fp_naturalxsec_map(
                         # how many stations are in the node cross section?
                         nstations = len(topobathy_data_bytw.loc[seg_idx])
                         
-
                         # populate cross section size (# of stations) array
                         size_bathy_g[seg, frj] = nstations
                         
@@ -641,12 +640,12 @@ def diffusive_input_data_v02(
     
     jorder_reaches = sorted(tr, key=lambda x: x[0])
     mx_jorder = max(jorder_reaches)[0]  # maximum junction order of subnetwork of TW
-    
 
     ordered_reaches = {}
     rchhead_reaches = {}
     rchbottom_reaches = {}
     z_all = {}
+    import pdb; pdb.set_trace()
     for o, rch in jorder_reaches:
         
         # add one more segment(fake) to the end of a list of segments to account for node configuration.

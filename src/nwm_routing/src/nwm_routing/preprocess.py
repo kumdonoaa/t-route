@@ -178,6 +178,7 @@ def nwm_network_preprocess(
     if diffusive_domain:
         
         rconn = nhd_network.reverse_network(connections)
+
         for tw in diffusive_domain:
             
             # ===== build diffusive network data objects ==== 
