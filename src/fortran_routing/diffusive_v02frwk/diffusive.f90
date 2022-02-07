@@ -778,6 +778,7 @@ contains
     deallocate(currentSquareDepth, ini_y, ini_q, notSwitchRouting, currentROutingDiffusive )
     deallocate(tarr_ql, varr_ql, tarr_ub, varr_ub, tarr_qtrib, varr_qtrib)
     deallocate(mstem_frj)
+    deallocate(x_bathy, z_bathy, mann_bathy, size_bathy)
 
 
   end subroutine diffnw
