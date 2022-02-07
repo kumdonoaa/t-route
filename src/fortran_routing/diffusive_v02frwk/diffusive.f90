@@ -309,22 +309,22 @@ contains
   !-----------------------------------------------------------------------------
   ! variable initializations
 
-    routingNotChanged = 0
+    routingNotChanged   = 0
     applyNaturalSection = 1
-    x          = 0.0
-    newQ       = -999
-    newY       = -999
-    t          = t0*60.0     ! [min]
-    q_sk_multi = 1.0
-    oldQ       = iniq
-    newQ       = oldQ
-    qp         = oldQ
-    dimensionless_Cr = -999
-    dimensionless_Fo = -999
-    dimensionless_Fi = -999
-    dimensionless_Di = -999
-    dimensionless_Fc = -999
-    dimensionless_D  = -999
+    x                   = 0.0
+    newQ                = -999
+    newY                = -999
+    t                   = t0*60.0     ! [min]
+    q_sk_multi          = 1.0
+    oldQ                = iniq
+    newQ                = oldQ
+    qp                  = oldQ
+    dimensionless_Cr    = -999
+    dimensionless_Fo    = -999
+    dimensionless_Fi    = -999
+    dimensionless_Di    = -999
+    dimensionless_Fc    = -999
+    dimensionless_D     = -999
 
 
   !-----------------------------------------------------------------------------
@@ -333,7 +333,7 @@ contains
     ! Create a dummy array containing mainstem reaches
     nmstem_rch = 0
     do j = 1, nlinks
-      if (frnw_g(j,3) >= 2) then ! mainstem reach identification
+      if (frnw_g(j,3) >= 1) then ! mainstem reach identification
         nmstem_rch          = nmstem_rch + 1
         dmy_frj(nmstem_rch) = j
       end if
@@ -1600,9 +1600,10 @@ contains
 
     ! As x_bathy data take negative values for the left of the streamline (where x=0) while positive for the right when looking from
     ! upstream to downstream. This subroutine takes zero at left-most x data point, so an adjustment is required.
+
     do ic = 1, size_bathy(idx_node, idx_reach)
       x_bathy_leftzero(ic) = - x_bathy(1, idx_node, idx_reach) + x_bathy(ic, idx_node, idx_reach)
-    enddo
+    end do
         
     do ic = 2, size_bathy(idx_node, idx_reach) + 1
       x1         = x_bathy_leftzero(ic-1)
@@ -1610,7 +1611,7 @@ contains
       xcs(ic)    = x1 * f2m
       ycs(ic)    = y1 * f2m
       manncs(ic) = mann_bathy(ic-1, idx_node, idx_reach)
-    enddo
+    end do
 
     num = maxTableLength
 
@@ -1662,7 +1663,7 @@ contains
           i_find        = 0
           i_end(i_area) = ic
         endif
-      enddo
+      end do
 
       cal_area       = 0.0
       cal_peri       = 0.0
