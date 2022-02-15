@@ -482,7 +482,7 @@ def fp_naturalxsec_map(
                         # populate cross section x, z and mannings n arrays
                         x_bathy_g[0:nstations, seg, frj]    = topobathy_data_bytw.loc[seg_idx].xid_d
                         z_bathy_g[0:nstations, seg, frj]    = topobathy_data_bytw.loc[seg_idx].z
-                        mann_bathy_g[0:nstations, seg, frj] = topobathy_data_bytw.loc[seg_idx].n
+                        mann_bathy_g[0:nstations, seg, frj] = topobathy_data_bytw.loc[seg_idx].nd
                         
                         # if terminal node of the network, then adjust the cross section z data using
                         # channel slope and length data
@@ -547,7 +547,7 @@ def diffusive_input_data_v02(
     # upstream boundary condition timestep (sec)
     dt_ub_g = dt
     # downstream boundary condition timestep (sec)
-    dt_db_g = dt * qts_subdivisions
+    dt_db_g = 360.0  #dt * qts_subdivisions
     # tributary inflow timestep (sec)
     dt_qtrib_g = dt
     # time interval at which flow and depth simulations are written out by Tulane diffusive model
@@ -697,7 +697,8 @@ def diffusive_input_data_v02(
     adj_alt1(
         mx_jorder, ordered_reaches, param_df, dbfksegID, z_all
     )
-    
+    import os
+    output_path="./"
     # --------------------------------------------------------------------------------------
     #                                 Step 0-4
     #     Make Fortran-Python channel network mapping variables.
@@ -718,6 +719,8 @@ def diffusive_input_data_v02(
 
     # covert data type from integer to float for frnw  
     dfrnw_g = frnw_g.astype('float')
+    
+    np.savetxt("./frnw_g.txt", frnw_g, fmt='%10i')
 
     # ---------------------------------------------------------------------------------
     #                              Step 0-5
@@ -741,6 +744,16 @@ def diffusive_input_data_v02(
         mxncomp_g,
         nrch_g,
     )
+     # saved txt file has row for segment and colunum for frj
+    np.savetxt("./temp/z_ar.txt", z_ar_g, fmt='%15.5f')
+    np.savetxt("./temp/bo_ar.txt", bo_ar_g, fmt='%15.5f')
+    np.savetxt("./temp/traps_ar.txt", traps_ar_g, fmt='%15.5f')
+    np.savetxt("./temp/tw_ar.txt", tw_ar_g, fmt='%15.5f')
+    np.savetxt("./temp/twcc_ar.txt", twcc_ar_g, fmt='%15.5f')
+    np.savetxt("./temp/mann_ar.txt", mann_ar_g, fmt='%15.5f')
+    np.savetxt("./temp/manncc_ar.txt", manncc_ar_g, fmt='%15.5f')
+    np.savetxt("./temp/so_ar.txt", so_ar_g, fmt='%15.6f') 
+    np.savetxt("./temp/dx_ar.txt", dx_ar_g, fmt='%15.5f')   
     
     # ---------------------------------------------------------------------------------
     #                              Step 0-6
@@ -765,7 +778,20 @@ def diffusive_input_data_v02(
                 # set lower limit on initial flow condition
                 if iniq[seg, frj]<0.0001:
                     iniq[seg, frj]=0.0001
-
+                    
+    frj= -1
+    with open("./temp/iniq_ar.txt",'a') as pyqini:    
+        for x in range(mx_jorder,-1,-1):   
+            for head_segment, reach in ordered_reaches[x]:                  
+                seg_list= reach["segments_list"]
+                ncomp= reach["number_segments"]             
+                frj= frj+1     
+                for seg in range(0,ncomp):                               
+                    segID= seg_list[seg]                  
+                    dmy1= iniq[seg, frj]
+                    pyqini.write("%s %s %s\n" %\
+                                (str(frj+1), str(seg+1), str(dmy1)) )                   
+                                # <- +1 is added to frj for accommodating Fortran indexing. 
     # ---------------------------------------------------------------------------------
     #                              Step 0-7
 
@@ -786,6 +812,23 @@ def diffusive_input_data_v02(
         qlat_g,
     )
     
+    frj= -1
+    with open("./temp/qlat_ar.txt",'a') as pyql:
+    #if 1==1:
+        for x in range(mx_jorder,-1,-1):   
+            for head_segment, reach in ordered_reaches[x]:                  
+                seg_list= reach["segments_list"]
+                ncomp= reach["number_segments"]             
+                frj= frj+1     
+                for seg in range(0,ncomp):                               
+                    segID= seg_list[seg]
+                    for tsi in range (0,nts_ql_g):
+                        t_min= dt_ql_g/60.0*float(tsi)                        
+                        dmy1= qlat_g[tsi, seg, frj]
+                        pyql.write("%s %s %s %s\n" %\
+                                (str(frj+1), str(seg+1), str(t_min), str(dmy1)) )                   
+                                # <- +1 is added to frj for accommodating Fortran indexing. 
+    
     # ---------------------------------------------------------------------------------
     #                              Step 0-8
 
@@ -804,7 +847,8 @@ def diffusive_input_data_v02(
 
     # this is a place holder that uses normal depth and the lower boundary.
     # we will need to revisit this 
-    nts_db_g = 1
+    #nts_db_g = 1
+    nts_db_g = int((tfin_g - t0_g) * 3600.0 / dt_db_g)
     dbcd_g = -np.ones(nts_db_g)  
 
     # ---------------------------------------------------------------------------------------------
@@ -826,6 +870,19 @@ def diffusive_input_data_v02(
                 # will not be in the initial_conditions array, but rather will be in the waterbodies_df array
                 qtrib_g[0,frj] = initial_conditions.loc[head_segment, 'qu0']
     
+    frj= -1
+    with open(os.path.join(output_path,"qtrib_ar.txt"),'a') as pyqtrib:
+        for x in range(mx_jorder,-1,-1):   
+            for head_segment, reach in ordered_reaches[x]:                  
+                seg_list= reach["segments_list"]
+                ncomp= reach["number_segments"]             
+                frj= frj+1     
+                for tsi in range (0, nts_qtrib_g):
+                    t_min=  dt_qtrib_g/60.0*float(tsi)                        
+                    dmy1= qtrib_g[tsi, frj]
+                    pyqtrib.write("%s %s %s\n" %\
+                                 (str(frj+1), str(t_min), str(dmy1)) )  
+    
     # ---------------------------------------------------------------------------------
     #                              Step 0-10
 
@@ -840,8 +897,27 @@ def diffusive_input_data_v02(
                                                                    mxncomp_g, 
                                                                    nrch_g,
                                                                    dbfksegID)
+    
+    #import pdb;  pdb.set_trace()
+    frj= -1
+    with open(os.path.join(output_path,"bathy_data.txt"),'a') as pybathy:
+        for x in range(mx_jorder,-1,-1):   
+            for head_segment, reach in ordered_reaches[x]:                  
+                seg_list= reach["segments_list"]
+                ncomp= reach["number_segments"]             
+                frj= frj+1
+                headsegID= seg_list[0]                 
+                if mainstem_seg_list.count(headsegID) > 0:
+                    for seg in range(0,ncomp):  
+                        #import pdb; pdb.set_trace()
+                        for idp in range(0, size_bathy_g[seg, frj]):
+                            dmy1 = x_bathy_g[idp, seg, frj]
+                            dmy2 = z_bathy_g[idp, seg, frj]
+                            dmy3 = mann_bathy_g[idp, seg, frj]                            
+                            pybathy.write("%s %s %s %s %s %s\n" %\
+                                 (str(idp+1), str(seg+1), str(frj+1), str(dmy1), str(dmy2), str(dmy3))) 
 
-
+    
     # TODO: Call uniform flow lookup table creation kernel    
     # ---------------------------------------------------------------------------------
     #                              Step 0-11
