@@ -197,7 +197,7 @@ contains
     ! test
     double precision :: sumdmy1, sumdmy2
     integer :: ts
-    open(unit=1, file="./input/tide_matagorda_city.txt")
+    open(unit=1, file="./input/tide_matagorda_city_10d.txt")
     open(unit=101, file="./output/cn-mod simulated discharge depth elev_lowercolorado.txt")
     allocate(dbcd(nts_db_g))
     do n = 1, nts_db_g
