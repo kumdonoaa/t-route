@@ -7,6 +7,7 @@ from collections import defaultdict
 import pandas as pd
 import numpy as np
 import xarray as xr
+import pathlib
 
 import troute.nhd_network_utilities_v02 as nnu
 import troute.nhd_network as nhd_network
@@ -210,9 +211,8 @@ def nwm_network_preprocess(
         # Check if hybrid-usgs or hybrid-usace reservoir DA is set to True
         reservoir_da = data_assimilation_parameters.get(
             'reservoir_da', 
-            {}
+            None
         )
-        
         if reservoir_da:
             usgs_hybrid  = reservoir_da.get(
                 'reservoir_persistence_usgs', 
@@ -242,7 +242,7 @@ def nwm_network_preprocess(
         else:
             rfc_forecast = False
 
-        if (param_file and reservoir_da) or (param_file and rfc_forecast):
+        if param_file and reservoir_da:
             waterbody_type_specified = True
             (
                 waterbody_types_df, 
@@ -689,6 +689,7 @@ def nwm_initial_warmstate_preprocess(
 def nwm_forcing_preprocess(
     run,
     forcing_parameters,
+    hybrid_parameters,
     da_run,
     data_assimilation_parameters,
     break_network_at_waterbodies,
@@ -866,7 +867,7 @@ def nwm_forcing_preprocess(
         usgs_timeslices_folder = pathlib.Path(usgs_timeslices_folder)
         usgs_files = [usgs_timeslices_folder.joinpath(f) for f in 
                       da_run['usgs_timeslice_files']]
-        
+        import pdb; pdb.set_trace()
         if usgs_files:
             usgs_df = (
                 nhd_io.get_obs_from_timeslices(
@@ -1138,16 +1139,41 @@ def nwm_forcing_preprocess(
     #---------------------------------------------------------------------------
     # Assemble coastal coupling data [WIP]
     
-    coastal_boundary_elev = forcing_parameters.get("coastal_boundary_elev_data", None)
-    coastal_ncdf = forcing_parameters.get("coastal_ncdf", None)
+    #coastal_boundary_elev = forcing_parameters.get("coastal_boundary_elev_data", None)
+    #coastal_ncdf = forcing_parameters.get("coastal_ncdf", None)
 
-    if coastal_boundary_elev:
-        LOG.info("creating coastal dataframe ...")
-        coastal_df = nhd_io.build_coastal_dataframe(coastal_boundary_elev)
+    #if coastal_boundary_elev:
+    #    LOG.info("creating coastal dataframe ...")
+    #    coastal_df = nhd_io.build_coastal_dataframe(coastal_boundary_elev)
 
-    if coastal_ncdf:
-        LOG.info("creating coastal ncdf dataframe ...")
-        coastal_ncdf_df = nhd_io.build_coastal_ncdf_dataframe(coastal_ncdf)
+    #if coastal_ncdf:
+    #    LOG.info("creating coastal ncdf dataframe ...")
+    #    coastal_ncdf_df = nhd_io.build_coastal_ncdf_dataframe(coastal_ncdf)
+    coastal_boundary_elev_files = forcing_parameters.get('coastal_boundary_input_file', None) 
+    coastal_boundary_domain_files = hybrid_parameters.get('coastal_boundary_domain', None) 
+    
+    #coastal_boundary_elev_files = pathlib.Path('boundary_forcing')
+    #coastal_boundary_elev_files = coastal_boundary_elev_files.joinpath('schout_1.nc')
+    
+    import pdb; pdb.set_trace()
+    if coastal_boundary_elev_files:
+        start_time = time.time()    
+        
+        coastal_boundary_domain   = nhd_io.read_coastal_boundary_domain(coastal_boundary_domain_files)          
+        coastal_boundary_depth_df = nhd_io.build_coastal_ncdf_dataframe(
+                                                    coastal_boundary_elev_files,
+                                                    coastal_boundary_domain
+                                                    )
+                
+        LOG.debug(
+            "coastal boundary elevation observation DataFrame creation complete in %s seconds." \
+            % (time.time() - start_time)
+        )
+            
+    else:
+        coastal_boundary_depth_df = pd.DataFrame()
+
+
 
     #---------------------------------------------------------------------------
     # Trim the time-extent of the streamflow_da usgs_df

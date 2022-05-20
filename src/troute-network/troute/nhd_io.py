@@ -13,9 +13,11 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 from toolz import compose
-import netCDF4
+import netCDF4 
 from joblib import delayed, Parallel
 from cftime import date2num
+import dateutil.parser as dparser
+from datetime import datetime, timedelta
 
 from troute.nhd_network import reverse_dict
 
@@ -86,7 +88,7 @@ def read_config_file(custom_input_file):
     compute_parameters           (dict): Input parameters re computation settings
     forcing_parameters           (dict): Input parameters re model forcings
     restart_parameters           (dict): Input parameters re model restart
-    diffusive_parameters         (dict): Input parameters re diffusive wave model
+    hybrid_parameters            (dict): Input parameters re hybrid MC/diffusive wave model
     output_parameters            (dict): Input parameters re output writing
     parity_parameters            (dict): Input parameters re parity assessment
     data_assimilation_parameters (dict): Input parameters re data assimilation
@@ -114,7 +116,7 @@ def read_config_file(custom_input_file):
     compute_parameters = data.get("compute_parameters", {})
     forcing_parameters = compute_parameters.get("forcing_parameters", {})
     restart_parameters = compute_parameters.get("restart_parameters", {})
-    diffusive_parameters = compute_parameters.get("diffusive_parameters", {})
+    hybrid_parameters= compute_parameters.get("hybrid_parameters", {})
     data_assimilation_parameters = compute_parameters.get(
         "data_assimilation_parameters", {}
     )
@@ -129,7 +131,7 @@ def read_config_file(custom_input_file):
         compute_parameters,
         forcing_parameters,
         restart_parameters,
-        diffusive_parameters,
+        hybrid_parameters,
         output_parameters,
         parity_parameters,
         data_assimilation_parameters,
@@ -147,6 +149,29 @@ def read_diffusive_domain(domain_file):
     -------
     data (dict int: [int]): domain tailwater segments: list of segments in domain 
                             (includeing tailwater segment) 
+    
+    '''
+    if domain_file[-4:] == "yaml":
+        with open(domain_file) as domain:
+            data = yaml.load(domain, Loader=yaml.SafeLoader)
+    else:
+        with open(domain_file) as domain:
+            data = json.load(domain)
+            
+    return data
+
+def read_coastal_boundary_domain(domain_file):
+    '''
+    Read coastal boundary domain from .ymal or .json file.
+    
+    Arguments
+    ---------
+    domain_file (str or pathlib.Path): Path of coastal boundary domain file
+    
+    Returns
+    -------
+    data (dict int: int): diffusive domain tailwater segments: coastal domain segments 
+                        
     
     '''
     if domain_file[-4:] == "yaml":
@@ -1526,11 +1551,52 @@ def build_coastal_dataframe(coastal_boundary_elev):
     return coastal_df
 
 
-def build_coastal_ncdf_dataframe(coastal_ncdf):
-    with xr.open_dataset(coastal_ncdf) as ds:
-        coastal_ncdf_df = ds[["elev", "depth"]]
-        return coastal_ncdf_df.to_dataframe()
+def build_coastal_ncdf_dataframe(coastal_files, coastal_boundary_domain):
+    #with xr.open_dataset(coastal_ncdf) as ds:
+    #    coastal_ncdf_df = ds[["elev", "depth"]]
+    #    return coastal_ncdf_df.to_dataframe()
+    
+    tws = list(coastal_boundary_domain.keys())
+    coastal_boundary_nodes = list(coastal_boundary_domain.values())
+    import pdb;pdb.set_trace()
+    #with netCDF4.Dataset(
+    #    filename = coastal_files,
+    #    mode = 'r',
+    #    format = "NETCDF4"
+    #) as ds:
 
+    ds = netCDF4.Dataset(filename = coastal_files,  mode = 'r', format = "NETCDF4")
+    
+    #elev_NAVD88 = ds.variables['elev'][:, coastal_boundary_nodes].filled(fill_value = np.nan)
+    depth_bathy = ds.variables['depth'][coastal_boundary_nodes].filled(fill_value = np.nan)
+    timesteps   = ds.variables['time'][:]    
+    start_date = ds.variables['time'].units
+    
+    start_date   = dparser.parse(start_date,fuzzy=True)
+    dt_schism    = 3600 # [sec]
+    dt_timeslice = timedelta(minutes=dt_schism/60.0)
+    start_date   = start_date + dt_timeslice
+    tfin         =  start_date + dt_timeslice*(len(timesteps)-1)
+    timestamps   = pd.date_range(start_date, tfin, freq=dt_timeslice)
+    timestamps   = timestamps.strftime('%Y-%m-%d %H:%M:%S')
+        
+    eta= [max(0.0, -1.0*x) for x in depth_bathy]
+
+    timeslice_schism_list=[]
+    for t in range(0, len(timesteps)):
+        timeslice= np.full(len(tws), timestamps[t])
+        timeslice_schism  = (pd.DataFrame({
+                                'stationId' : tws,
+                                'datetime'  : timeslice,
+                                'depth'     : elev_NAVD88[:,t] - eta
+                            }).
+                             set_index(['stationId', 'datetime']).
+                             unstack(1, fill_value = np.nan)['depth'])
+        timeslice_schism_list.append(timeslice_schism)
+    
+    coastal_boundary_depth_df = pd.concat(timeslice_schism_list, axis=1, ignore_index=False)
+    
+    return coastal_boundary_depth_df
 
 def lastobs_df_output(
     lastobs_df,

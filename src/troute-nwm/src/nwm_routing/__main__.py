@@ -73,7 +73,6 @@ def nwm_route(
     waterbody_parameters,
     waterbody_types_df,
     waterbody_type_specified,
-    diffusive_parameters,
     diffusive_network_data,
     topobathy_data,
     subnetwork_list,
@@ -148,7 +147,6 @@ def nwm_route(
                 usgs_df,
                 lastobs_df,
                 da_parameter_dict,
-                diffusive_parameters,
                 waterbodies_df,
                 topobathy_data,
             )
@@ -302,7 +300,7 @@ def main_v03(argv):
         compute_parameters,
         forcing_parameters,
         restart_parameters,
-        diffusive_parameters,
+        hybrid_parameters,
         output_parameters,
         parity_parameters,
         data_assimilation_parameters,
@@ -430,6 +428,7 @@ def main_v03(argv):
     ) = nwm_forcing_preprocess(
         run_sets[0],
         forcing_parameters,
+        hybrid_parameters,
         da_sets[0] if data_assimilation_parameters else {},
         data_assimilation_parameters,
         break_network_at_waterbodies,
@@ -496,7 +495,6 @@ def main_v03(argv):
             waterbody_parameters,
             waterbody_types_df,
             waterbody_type_specified,
-            diffusive_parameters,
             diffusive_network_data,
             topobathy_data,
             subnetwork_list,
@@ -537,6 +535,7 @@ def main_v03(argv):
             ) = nwm_forcing_preprocess(
                 run_sets[run_set_iterator + 1],
                 forcing_parameters,
+                hybrid_parameters,
                 da_sets[run_set_iterator + 1] if data_assimilation_parameters else {},
                 data_assimilation_parameters,
                 break_network_at_waterbodies,
@@ -691,7 +690,7 @@ async def main_v03_async(argv):
         compute_parameters,
         forcing_parameters,
         restart_parameters,
-        diffusive_parameters,
+        hybrid_parameters,
         output_parameters,
         parity_parameters,
         data_assimilation_parameters,
@@ -838,8 +837,7 @@ async def main_v03_async(argv):
             waterbody_parameters,
             waterbody_types_df,
             waterbody_type_specified,
-            diffusive_parameters,
-        )
+         )
 
         forcings_task = loop.run_in_executor(
             pool_IO,
@@ -927,7 +925,6 @@ async def main_v03_async(argv):
         waterbody_parameters,
         waterbody_types_df,
         waterbody_type_specified,
-        diffusive_parameters,
     )
 
     # nwm_final_output_generator()

@@ -42,15 +42,16 @@ compute_parameters:
         diffusive_domain  : domain/diffusive_domain.yaml
         use_natl_xsections: False
         topobathy_domain  : domain/diffusive_natural_xs_03312022.nc
+        coastal_boundary_domain : domain/coastal_boundary_domain.yaml
     forcing_parameters:
         #----------
-        qts_subdivisions        : 12
-        dt                      : 300
-        qlat_input_folder       : channel_forcing
-        qlat_file_pattern_filter: "*.CHRTOUT_DOMAIN1"
-        boundary_input_folder   : boundary_forcing
-        nts                     : 336
-        max_loop_size           : 28    
+        qts_subdivisions            : 12
+        dt                          : 300
+        qlat_input_folder           : channel_forcing
+        qlat_file_pattern_filter    : "*.CHRTOUT_DOMAIN1"
+        coastal_boundary_input_file : boundary_forcing/schout_1(1).nc        
+        nts                         : 336
+        max_loop_size               : 28    
     data_assimilation_parameters:
         #----------
         usgs_timeslices_folder   : usgs_TimeSlice/
