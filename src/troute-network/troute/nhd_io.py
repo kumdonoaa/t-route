@@ -1551,7 +1551,7 @@ def build_coastal_dataframe(coastal_boundary_elev):
     return coastal_df
 
 
-def build_coastal_ncdf_dataframe(coastal_files, coastal_boundary_domain):
+def build_coastal_ncdf_dataframe(coastal_files, coastal_boundary_domain, interpolation_frequency):
     #with xr.open_dataset(coastal_ncdf) as ds:
     #    coastal_ncdf_df = ds[["elev", "depth"]]
     #    return coastal_ncdf_df.to_dataframe()
@@ -1570,7 +1570,7 @@ def build_coastal_ncdf_dataframe(coastal_files, coastal_boundary_domain):
     start_date   = dparser.parse(start_date,fuzzy=True)
     dt_schism    = 3600 # [sec]
     dt_timeslice = timedelta(minutes=dt_schism/60.0)
-    start_date   = start_date + dt_timeslice
+    start_date   = start_date # + dt_timeslice
     tfin         =  start_date + dt_timeslice*(len(timesteps)-1)
     timestamps   = pd.date_range(start_date, tfin, freq=dt_timeslice)
     timestamps   = timestamps.strftime('%Y-%m-%d %H:%M:%S')
@@ -1596,6 +1596,8 @@ def build_coastal_ncdf_dataframe(coastal_files, coastal_boundary_domain):
     # apply linear interpolation for missing data in time
     coastal_boundary_depth_df_T = coastal_boundary_depth_df.transpose()
     
+    frequency = str(int(interpolation_frequency/60))+"min"   
+    interpolation_limit = 6
     interpolated = _interpolate_one(coastal_boundary_depth_df_T, interpolation_limit, frequecy) 
     
     

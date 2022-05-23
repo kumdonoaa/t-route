@@ -1149,11 +1149,10 @@ def nwm_forcing_preprocess(
     #if coastal_ncdf:
     #    LOG.info("creating coastal ncdf dataframe ...")
     #    coastal_ncdf_df = nhd_io.build_coastal_ncdf_dataframe(coastal_ncdf)
-    coastal_boundary_elev_files = forcing_parameters.get('coastal_boundary_input_file', None) 
-    coastal_boundary_domain_files = hybrid_parameters.get('coastal_boundary_domain', None) 
     
-    #coastal_boundary_elev_files = pathlib.Path('boundary_forcing')
-    #coastal_boundary_elev_files = coastal_boundary_elev_files.joinpath('schout_1.nc')
+    coastal_boundary_elev_files = forcing_parameters.get('coastal_boundary_input_file', None) 
+    coastal_boundary_domain_files = hybrid_parameters.get('coastal_boundary_domain', None)    
+    interpolation_frequency = forcing_parameters.get('coastal_boundary_input_interpolation_frequency', 3600) 
     
     import pdb; pdb.set_trace()
     if coastal_boundary_elev_files:
@@ -1162,7 +1161,8 @@ def nwm_forcing_preprocess(
         coastal_boundary_domain   = nhd_io.read_coastal_boundary_domain(coastal_boundary_domain_files)          
         coastal_boundary_depth_df = nhd_io.build_coastal_ncdf_dataframe(
                                                     coastal_boundary_elev_files,
-                                                    coastal_boundary_domain
+                                                    coastal_boundary_domain,
+                                                    interpolation_frequency,
                                                     )
                 
         LOG.debug(
