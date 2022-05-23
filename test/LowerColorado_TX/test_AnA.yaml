@@ -49,7 +49,7 @@ compute_parameters:
         dt                          : 300
         qlat_input_folder           : channel_forcing
         qlat_file_pattern_filter    : "*.CHRTOUT_DOMAIN1"
-        coastal_boundary_input_file : boundary_forcing/schout_1(1).nc        
+        coastal_boundary_input_file : boundary_forcing/schout_1.nc        
         nts                         : 336
         max_loop_size               : 28    
     data_assimilation_parameters:

@@ -1556,18 +1556,13 @@ def build_coastal_ncdf_dataframe(coastal_files, coastal_boundary_domain):
     #    coastal_ncdf_df = ds[["elev", "depth"]]
     #    return coastal_ncdf_df.to_dataframe()
     
-    tws = list(coastal_boundary_domain.keys())
-    coastal_boundary_nodes = list(coastal_boundary_domain.values())
-    import pdb;pdb.set_trace()
-    #with netCDF4.Dataset(
-    #    filename = coastal_files,
-    #    mode = 'r',
-    #    format = "NETCDF4"
-    #) as ds:
-
+    # retrieve coastal elevation, topo depth, and temporal data
     ds = netCDF4.Dataset(filename = coastal_files,  mode = 'r', format = "NETCDF4")
     
-    #elev_NAVD88 = ds.variables['elev'][:, coastal_boundary_nodes].filled(fill_value = np.nan)
+    tws = list(coastal_boundary_domain.keys())
+    coastal_boundary_nodes = list(coastal_boundary_domain.values())
+    
+    elev_NAVD88 = ds.variables['elev'][:, coastal_boundary_nodes].filled(fill_value = np.nan)
     depth_bathy = ds.variables['depth'][coastal_boundary_nodes].filled(fill_value = np.nan)
     timesteps   = ds.variables['time'][:]    
     start_date = ds.variables['time'].units
@@ -1581,20 +1576,28 @@ def build_coastal_ncdf_dataframe(coastal_files, coastal_boundary_domain):
     timestamps   = timestamps.strftime('%Y-%m-%d %H:%M:%S')
         
     eta= [max(0.0, -1.0*x) for x in depth_bathy]
-
+    
+    # create a dataframe of water depth at coastal domain nodes
     timeslice_schism_list=[]
     for t in range(0, len(timesteps)):
         timeslice= np.full(len(tws), timestamps[t])
         timeslice_schism  = (pd.DataFrame({
                                 'stationId' : tws,
                                 'datetime'  : timeslice,
-                                'depth'     : elev_NAVD88[:,t] - eta
+                                #'depth'     : elev_NAVD88[:,t] - eta
+                                'depth'     : elev_NAVD88[t,:] - eta
                             }).
                              set_index(['stationId', 'datetime']).
                              unstack(1, fill_value = np.nan)['depth'])
         timeslice_schism_list.append(timeslice_schism)
-    
+    import pdb; pdb.set_trace()
     coastal_boundary_depth_df = pd.concat(timeslice_schism_list, axis=1, ignore_index=False)
+    
+    # apply linear interpolation for missing data in time
+    coastal_boundary_depth_df_T = coastal_boundary_depth_df.transpose()
+    
+    interpolated = _interpolate_one(coastal_boundary_depth_df_T, interpolation_limit, frequecy) 
+    
     
     return coastal_boundary_depth_df
 
