@@ -1571,7 +1571,8 @@ def build_coastal_ncdf_dataframe(coastal_files, coastal_boundary_domain, interpo
     dt_schism    = 3600 # [sec]
     dt_timeslice = timedelta(minutes=dt_schism/60.0)
     start_date   = start_date # + dt_timeslice
-    tfin         =  start_date + dt_timeslice*(len(timesteps)-1)
+    #tfin         =  start_date + dt_timeslice*(len(timesteps)-1)
+    tfin         =  start_date + dt_timeslice*len(timesteps)
     timestamps   = pd.date_range(start_date, tfin, freq=dt_timeslice)
     timestamps   = timestamps.strftime('%Y-%m-%d %H:%M:%S')
         
@@ -1579,28 +1580,29 @@ def build_coastal_ncdf_dataframe(coastal_files, coastal_boundary_domain, interpo
     
     # create a dataframe of water depth at coastal domain nodes
     timeslice_schism_list=[]
-    for t in range(0, len(timesteps)):
+    for t in range(0, len(timesteps)+1):
         timeslice= np.full(len(tws), timestamps[t])
+        if t==0:
+            depth = np.nan
+        else:
+            depth = elev_NAVD88[t-1,:] - eta        
+        
         timeslice_schism  = (pd.DataFrame({
                                 'stationId' : tws,
                                 'datetime'  : timeslice,
                                 #'depth'     : elev_NAVD88[:,t] - eta
-                                'depth'     : elev_NAVD88[t,:] - eta
+                                'depth'     : depth #elev_NAVD88[t,:] - eta
                             }).
                              set_index(['stationId', 'datetime']).
                              unstack(1, fill_value = np.nan)['depth'])
         timeslice_schism_list.append(timeslice_schism)
     import pdb; pdb.set_trace()
+    
     coastal_boundary_depth_df = pd.concat(timeslice_schism_list, axis=1, ignore_index=False)
     
-    # apply linear interpolation for missing data in time
-    coastal_boundary_depth_df_T = coastal_boundary_depth_df.transpose()
-    
-    frequency = str(int(interpolation_frequency/60))+"min"   
-    interpolation_limit = 6
-    interpolated = _interpolate_one(coastal_boundary_depth_df_T, interpolation_limit, frequecy) 
-    
-    
+    # linearly extrapolate depth value at start date
+    coastal_boundary_depth_df.iloc[:,0] = 2.0*coastal_boundary_depth_df.iloc[:,1] - coastal_boundary_depth_df.iloc[:,2]   
+ 
     return coastal_boundary_depth_df
 
 def lastobs_df_output(
