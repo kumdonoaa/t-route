@@ -544,6 +544,65 @@ def fp_da_map(
         timestamps   = pd.date_range(t0, tfin, freq=dt_timeslice)
     
         usgs_df_complete = usgs_df.replace(np.nan, -4444.0)
+        import pdb; pdb.set_trace()
+        for i in range(len(timestamps)):
+            if timestamps[i] not in usgs_df.columns:
+                usgs_df_complete.insert(i, timestamps[i], -4444.0*np.ones(len(usgs_df)), allow_duplicates=False)
+        import pdb; pdb.set_trace()  
+        frj = -1
+        for x in range(mx_jorder, -1, -1):
+            for head_segment, reach in ordered_reaches[x]:
+                seg_list = reach["segments_list"]
+                ncomp = reach["number_segments"]
+                frj = frj + 1
+                for seg in range(0, ncomp):
+                    segID = seg_list[seg]
+                    if segID in usgs_df_complete.index:
+                        usgs_da_g[:,frj] = usgs_df_complete.loc[segID].values[0:nts_da_g]
+                        usgs_da_reach_g[frj] = frj + 1  # Fortran-Python index relationship, that is Python i = Fortran i+1
+        import pdb; pdb.set_trace()                
+    return nts_da_g, usgs_da_g, usgs_da_reach_g
+'''
+def fp_coastal_boundary_map(
+    mx_jorder,
+    ordered_reaches,
+    coastal_boundary_depth_df,
+    nrch_g,
+    t0,
+    nsteps,
+    dt_da_g,
+    t0_g,
+    tfin_g):
+    """
+    Data assimilatoin data mapping between Python and Fortran
+    
+    Parameters
+    ----------
+    mx_jorder       -- (int) maximum network reach order
+    ordered_reaches -- (dict) reaches and reach metadata by junction order
+    coastal_boundary_depth_df -- (DataFrame) coastal boundary depth data at one hour time steps
+    t0              -- (datetime) initial date
+    nsteps          -- (int)  
+    dt_da_g         -- (int) numer of Data Assimilation timesteps
+    t0_g            -- (float) diffusive model's initial simulation time [hr] (by default, zero)
+    tfin_g          -- (float) diffusive model's final simulation time [hr] 
+    
+    Returns
+    -------
+    nts_da_g        -- (int) number of DA timesteps
+    usgs_da_g       -- (float) usgs oberved streamflow data [cms]
+    usgs_da_reach_g -- (int) indices of stream reaches where DA is applied    
+    """ 
+    nts_da_g    = int((tfin_g - t0_g) * 3600.0 / dt_da_g) + 1  # include initial time 0 to the final time    
+    usgs_da_g   = -4444.0*np.ones((nts_da_g, nrch_g))
+    usgs_da_reach_g = np.zeros(nrch_g, dtype='i4')
+    
+    if not usgs_df.empty:    
+        dt_timeslice = timedelta(minutes=dt_da_g/60.0)
+        tfin         = t0 + dt_timeslice*nsteps
+        timestamps   = pd.date_range(t0, tfin, freq=dt_timeslice)
+    
+        usgs_df_complete = usgs_df.replace(np.nan, -4444.0)
     
         for i in range(len(timestamps)):
             if timestamps[i] not in usgs_df.columns:
@@ -562,7 +621,7 @@ def fp_da_map(
                         usgs_da_reach_g[frj] = frj + 1  # Fortran-Python index relationship, that is Python i = Fortran i+1
                        
     return nts_da_g, usgs_da_g, usgs_da_reach_g
-
+'''
 def diffusive_input_data_v02(
     tw,
     connections,
@@ -581,6 +640,7 @@ def diffusive_input_data_v02(
     waterbodies_df,
     topobathy_data_bytw,
     usgs_df,
+    coastal_boundary_depth_df,
 ):
     """
     Build input data objects for diffusive wave model

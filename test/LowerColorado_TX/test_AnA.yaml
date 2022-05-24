@@ -50,7 +50,6 @@ compute_parameters:
         qlat_input_folder                             : channel_forcing
         qlat_file_pattern_filter                      : "*.CHRTOUT_DOMAIN1"
         coastal_boundary_input_file                   : boundary_forcing/schout_1.nc  
-        coastal_boundary_input_interpolation_frequency: 3600  # [sec]
         nts                                           : 336
         max_loop_size                                 : 28    
     data_assimilation_parameters:

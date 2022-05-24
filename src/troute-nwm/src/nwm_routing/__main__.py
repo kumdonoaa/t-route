@@ -76,6 +76,7 @@ def nwm_route(
     diffusive_network_data,
     topobathy_data,
     subnetwork_list,
+    coastal_boundary_depth_df,
 ):
 
     ################### Main Execution Loop across ordered networks
@@ -149,6 +150,7 @@ def nwm_route(
                 da_parameter_dict,
                 waterbodies_df,
                 topobathy_data,
+                coastal_boundary_depth_df,
             )
         )
         LOG.debug("Diffusive computation complete in %s seconds." % (time.time() - start_time_diff))
@@ -424,7 +426,8 @@ def main_v03(argv):
         reservoir_usgs_df, 
         reservoir_usgs_param_df,
         reservoir_usace_df,
-        reservoir_usace_param_df
+        reservoir_usace_param_df,
+        coastal_boundary_depth_df
     ) = nwm_forcing_preprocess(
         run_sets[0],
         forcing_parameters,
@@ -498,6 +501,7 @@ def main_v03(argv):
             diffusive_network_data,
             topobathy_data,
             subnetwork_list,
+            coastal_boundary_depth_df,
         )
         
         # returns list, first item is run result, second item is subnetwork items
@@ -532,6 +536,7 @@ def main_v03(argv):
                 _,
                 reservoir_usace_df,
                 _,
+                coastal_boundary_depth_df,
             ) = nwm_forcing_preprocess(
                 run_sets[run_set_iterator + 1],
                 forcing_parameters,
