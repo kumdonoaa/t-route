@@ -312,7 +312,7 @@ def main_v03(argv):
         parity_parameters,
         data_assimilation_parameters,
     ) = _input_handler_v03(args)
-    import pdb; pdb.set_trace()
+
     showtiming = log_parameters.get("showtiming", None)
     if showtiming:
         task_times = {}

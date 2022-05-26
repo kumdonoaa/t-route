@@ -45,6 +45,7 @@ compute_parameters:
         run_refactored_network: True
         refactored_domain: domain/lcra_refactored_diffusive_domain_042122.yaml
         refactored_topobathy_domain: domain/lcra_refac_diffusive_natural_xs_042122.nc
+        coastal_boundary_domain: domain/coastal_boundary_domain.yaml
     forcing_parameters:
         #----------
         qts_subdivisions                              : 12
@@ -63,7 +64,7 @@ compute_parameters:
         streamflow_da:
             #----------
             streamflow_nudging            : True
-            diffusive_streamflow_nudging  : False
+            diffusive_streamflow_nudging  : True
             gage_segID_crosswalk_file     : domain/RouteLink.nc
             crosswalk_gage_field          : 'gages'
             crosswalk_segID_field         : 'link'

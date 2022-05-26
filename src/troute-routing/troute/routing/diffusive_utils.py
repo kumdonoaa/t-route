@@ -534,18 +534,41 @@ def fp_da_map(
     nts_da_g    = int((tfin_g - t0_g) * 3600.0 / dt_da_g) + 1  # include initial time 0 to the final time    
     usgs_da_g   = -4444.0*np.ones((nts_da_g, nrch_g))
     usgs_da_reach_g = np.zeros(nrch_g, dtype='i4')
-    
+
     if not usgs_df.empty:    
         dt_timeslice = timedelta(minutes=dt_da_g/60.0)
-        tfin         = t0 + dt_timeslice*nsteps
+        tfin         = t0 + dt_timeslice*(nts_da_g-1)
         timestamps   = pd.date_range(t0, tfin, freq=dt_timeslice)
-    
-        usgs_df_complete = usgs_df.replace(np.nan, -4444.0)
-    
+        
+        # prepare usgs value for the time window defined by simulation time period as well as replacing nan by -4444
+        usgs_df_complete = usgs_df.replace(np.nan, -4444.0) # replace nan by -4444
+
+        #for i in range(len(timestamps)):
+        #    if timestamps[i] not in usgs_df.columns:
+        #        usgs_df_complete.insert(i, timestamps[i], -4444.0*np.ones(len(usgs_df)), allow_duplicates=False)
+
+        timeslice_usgs_list = []
+        segId_gages = usgs_df_complete.index.values.tolist()
         for i in range(len(timestamps)):
-            if timestamps[i] not in usgs_df.columns:
-                usgs_df_complete.insert(i, timestamps[i], -4444.0*np.ones(len(usgs_df)), allow_duplicates=False)
-  
+            timeslice = np.full(len(segId_gages), timestamps[i])
+            if str(timestamps[i]) in usgs_df_complete.columns:
+                flow = usgs_df_complete[str(timestamps[i])].tolist()            
+            else: 
+                flow = -4444.0
+
+            timeslice_usgs = (pd.DataFrame({
+                                            'stationId' : segId_gages,
+                                            'datetime'  : timeslice,
+                                            'flow'     : flow 
+                                            }).set_index(['stationId', 'datetime']).
+                                                unstack(1, fill_value = np.nan)['flow'])
+            
+            timeslice_usgs_list.append(timeslice_usgs)                         
+        
+        usgs_df_complete_new = pd.concat(timeslice_usgs_list, axis=1, ignore_index=False)
+        usgs_df_complete_new.columns.name = None
+        usgs_df_complete_new.index.name = None
+
         frj = -1
         for x in range(mx_jorder, -1, -1):
             for head_segment, reach in ordered_reaches[x]:
@@ -554,10 +577,11 @@ def fp_da_map(
                 frj = frj + 1
                 for seg in range(0, ncomp):
                     segID = seg_list[seg]
-                    if segID in usgs_df_complete.index:
-                        usgs_da_g[:,frj] = usgs_df_complete.loc[segID].values[0:nts_da_g]
+                    if segID in usgs_df_complete.index:                        
+                        #usgs_da_g[:,frj] = usgs_df_complete.loc[segID].values[0:nts_da_g]
+                        usgs_da_g[:,frj] = usgs_df_complete_new.loc[segID].values[0:nts_da_g]
                         usgs_da_reach_g[frj] = frj + 1  # Fortran-Python index relationship, that is Python i = Fortran i+1
-                       
+
     return nts_da_g, usgs_da_g, usgs_da_reach_g
 
 def fp_refactored_network_map(
@@ -934,6 +958,82 @@ def fp_crosswalk_map(
                         jcol = jcol + 3   
     
     return crosswalk_nrow, crosswalk_ncol, crosswalk_g 
+
+def fp_coastal_boundary_input_map(
+    tw,
+    coastal_boundary_depth_df, 
+    nrch_g,
+    t0,
+    #nsteps,
+    dt_db_g,
+    t0_g,
+    tfin_g):
+    """
+    Data assimilatoin data mapping between Python and Fortran
+    Parameters
+    ----------
+    tw -- (int) Tailwater segment ID
+    coastal_boundary_depth_df -- (DataFrame) coastal boundary depth data at one hour time steps
+    t0              -- (datetime) initial date
+    #nsteps          -- (int) number of simulation time steps
+    dt_db_g         -- (int) numer of coastal boundary input data timesteps in sec
+    t0_g            -- (float) diffusive model's initial simulation time [hr] (by default, zero)
+    tfin_g          -- (float) diffusive model's final simulation time [hr] 
+    Returns
+    -------
+    dsbd_option     -- (int) 1 or 2 for coastal boundary depth data or normal depth data, respectively
+    nts_db_g        -- (int) number of coastal boundary input data timesteps
+    dbcd_g          -- (float) coastal boundary input data time series [m]
+    """
+    
+    nts_db_g  = int((tfin_g - t0_g) * 3600.0 / dt_db_g) + 1  # include initial time 0 to the final time    
+    dbcd_g    = np.ones(nts_db_g)    
+  
+    # test {
+    #import datetime
+    #strdate="2018-09-16 18:00:00" 
+    #datetimeobj=datetime.datetime.strptime(strdate, "%Y-%m-%d %H:%M:%S")
+    #t0 = datetimeobj
+    # } test
+    
+    if not coastal_boundary_depth_df.empty:    
+        dt_timeslice = timedelta(minutes=dt_db_g/60.0)
+        tfin         = t0 + dt_timeslice*(nts_db_g-1)
+        timestamps   = pd.date_range(t0, tfin, freq=dt_timeslice)
+ 
+        timeslice_dbcd_list = []
+        tws = coastal_boundary_depth_df.index.values.tolist()
+        for i in range(len(timestamps)):
+            timeslice = np.full(len(tws), timestamps[i])
+            if str(timestamps[i]) in coastal_boundary_depth_df.columns:
+                depth = coastal_boundary_depth_df[str(timestamps[i])].tolist()
+            else: 
+                depth = np.nan
+
+            timeslice_dbcd = (pd.DataFrame({
+                                            'stationId' : tws,
+                                            'datetime'  : timeslice,
+                                            'depth'     : depth 
+                                            }).set_index(['stationId', 'datetime']).
+                                                unstack(1, fill_value = np.nan)['depth'])
+            
+            timeslice_dbcd_list.append(timeslice_dbcd)                         
+        
+        dbcd_df = pd.concat(timeslice_dbcd_list, axis=1, ignore_index=False)
+
+        # interpolate missing value in NaN (np.nan) inbetween available values. For extrapolation, the result is the same as 
+        # a last available value either in the left or right.  
+        dbcd_df_interpolated = dbcd_df.interpolate(axis='columns', limit_direction='both', limit=6)
+
+        # if still missing data exists, do not use the coastal depth data as diffusive downstream boundary condition
+        if dbcd_df_interpolated.isnull().values.any():
+            dsbd_option = 2 # instead, use normal depth as the downstream boundary condition
+            dbcd_g[:] = 0.0
+        else: 
+            dsbd_option = 1 # use the data as prepared
+            dbcd_g[:] = dbcd_df_interpolated.loc[tw].values
+
+    return dsbd_option, nts_db_g, dbcd_g
      
 def diffusive_input_data_v02(
     tw,
@@ -988,7 +1088,7 @@ def diffusive_input_data_v02(
     # upstream boundary condition timestep (sec)
     dt_ub_g = dt
     # downstream boundary condition timestep (sec)
-    dt_db_g = dt * qts_subdivisions
+    dt_db_g = 3600.0  #schism simulation time step in sec
     # tributary inflow timestep (sec)
     dt_qtrib_g = dt
     # usgs_df time step used for data assimilation. The original timestep of USGS streamflow is 15 min but later interpolated at every dt in min.
@@ -1001,7 +1101,7 @@ def diffusive_input_data_v02(
     # initial timestep interval used by Tulane diffusive model
     dtini_g = dt
     t0_g = 0.0  # simulation start hr **set to zero for Fortran computation
-    tfin_g = (dt * nsteps)/60/60
+    tfin_g = (dt * nsteps)/60/60 # simulaton end in hr
     
     # package timestep variables into single array
     timestep_ar_g    = np.zeros(9)
@@ -1028,7 +1128,7 @@ def diffusive_input_data_v02(
     para_ar_g[7]  = 0.02831   # lower limit of discharge (default: 0.02831 cms)
     para_ar_g[8]  = 0.0001    # lower limit of channel bed slope (default: 0.0001)
     para_ar_g[9]  = 1.0     # weight in numerically computing 2nd derivative: 0: explicit, 1: implicit (default: 1.0)
-    para_ar_g[10] = 2      # downstream water depth boundary condition: 1: given water depth data, 2: normal depth
+    para_ar_g[10] = 2      # 2 by default. downstream water depth boundary condition: 1: given water depth data, 2: normal depth
     # number of reaches in network
     nrch_g = len(reach_list)
 
@@ -1240,14 +1340,20 @@ def diffusive_input_data_v02(
     # ---------------------------------------------------------------------------------
     #                              Step 0-9
 
-    #       Prepare downstrea boundary (bottom segments of TW reaches) data
+    #       Prepare downstrea boundary (bottom segments of TW reaches) data using 
+    #       coastal boundary depth data
     # ---------------------------------------------------------------------------------
-
-    # this is a place holder that uses normal depth and the lower boundary.
-    # we will need to revisit this 
-    nts_db_g = int((tfin_g - t0_g) * 3600.0 / dt_db_g)+1 
-    dbcd_g = np.zeros(nts_db_g)
-
+    dsbd_option, nts_db_g, dbcd_g =  fp_coastal_boundary_input_map(
+                                                    tw,
+                                                    coastal_boundary_depth_df, 
+                                                    nrch_g,
+                                                    t0,
+                                                    #nsteps,
+                                                    dt_db_g,
+                                                    t0_g,
+                                                    tfin_g)
+    
+    para_ar_g[10] = dsbd_option  # downstream water depth boundary condition: 1: given water depth data, 2: normal depth
     # ---------------------------------------------------------------------------------------------
     #                              Step 0-9-2
 
@@ -1282,7 +1388,7 @@ def diffusive_input_data_v02(
                                                                            mxncomp_g, 
                                                                            nrch_g,
                                                                            dbfksegID)
-  
+    import pdb; pdb.set_trace()
     # ---------------------------------------------------------------------------------------------
     #                              Step 0-11
 
@@ -1298,8 +1404,7 @@ def diffusive_input_data_v02(
                                                 dt_da_g,
                                                 t0_g,
                                                 tfin_g)
-    
- 
+
     # ---------------------------------------------------------------------------------------------
     #                              Step 0-12-1
 

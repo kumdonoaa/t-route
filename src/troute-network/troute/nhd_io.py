@@ -1590,7 +1590,7 @@ def build_coastal_ncdf_dataframe(
             depth = np.nan
         else:
             depth = elev_NAVD88[t-1,:] - eta        
-        
+
         timeslice_schism  = (pd.DataFrame({
                                 'stationId' : tws,
                                 'datetime'  : timeslice,
@@ -1599,8 +1599,9 @@ def build_coastal_ncdf_dataframe(
                             }).
                              set_index(['stationId', 'datetime']).
                              unstack(1, fill_value = np.nan)['depth'])
+
         timeslice_schism_list.append(timeslice_schism)
-    import pdb; pdb.set_trace()
+
     
     coastal_boundary_depth_df = pd.concat(timeslice_schism_list, axis=1, ignore_index=False)
     

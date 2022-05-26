@@ -1135,7 +1135,6 @@ def compute_diffusive_routing(
     usgs_df,
     lastobs_df,
     da_parameter_dict,
-    diffusive_parameters,
     waterbodies_df,
     topobathy_data,
     refactored_diffusive_domain,
@@ -1183,6 +1182,10 @@ def compute_diffusive_routing(
         else:
             refactored_diffusive_domain_bytw = None
             refactored_reaches_byrftw        = None
+            
+        # coastal boundary depth input data at TW
+        coastal_boundary_depth_bytw_df = coastal_boundary_depth_df.loc[tw].to_frame().T
+        
                  
         # build diffusive inputs
         diffusive_inputs = diff_utils.diffusive_input_data_v02(
@@ -1205,7 +1208,7 @@ def compute_diffusive_routing(
             diff_usgs_df,
             refactored_diffusive_domain_bytw,
             refactored_reaches_byrftw, 
-            coastal_boundary_depth_df,
+            coastal_boundary_depth_bytw_df,
         )
         
         # run the simulation

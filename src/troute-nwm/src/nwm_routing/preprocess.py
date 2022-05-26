@@ -943,7 +943,7 @@ def nwm_forcing_preprocess(
         usgs_timeslices_folder = pathlib.Path(usgs_timeslices_folder)
         usgs_files = [usgs_timeslices_folder.joinpath(f) for f in 
                       da_run['usgs_timeslice_files']]
-        import pdb; pdb.set_trace()
+
         if usgs_files:
             usgs_df = (
                 nhd_io.get_obs_from_timeslices(
@@ -1230,7 +1230,6 @@ def nwm_forcing_preprocess(
     coastal_boundary_domain_files = hybrid_parameters.get('coastal_boundary_domain', None)    
     #interpolation_frequency = forcing_parameters.get('coastal_boundary_input_interpolation_frequency', 3600) 
     
-    import pdb; pdb.set_trace()
     if coastal_boundary_elev_files:
         start_time = time.time()    
         
