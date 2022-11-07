@@ -9,6 +9,7 @@ import troute.nhd_io as nhd_io #FIXME
 from itertools import chain
 import geopandas as gpd
 from pathlib import Path
+import math
 
 __verbose__ = False
 __showtiming__ = False
@@ -73,6 +74,7 @@ def read_qlats(forcing_parameters, segment_index, nexus_to_downstream_flowpath_d
     if len(nexus_files_list) == 0:
         raise ValueError('No nexus input files found. Recommend checking \
         nexus_input_folder path in YAML configuration.')
+    
 
     #pd.concat((pd.read_csv(f, index_col=0, usecols=[1,2], header=None, engine='c').rename(columns={2:id_regex.match(f).group(1)}) for f in all_files[0:2]), axis=1).T
     id_regex = re.compile(r".*nex-(\d+)_.*.csv")
@@ -83,39 +85,46 @@ def read_qlats(forcing_parameters, segment_index, nexus_to_downstream_flowpath_d
                 columns={2:int(id_regex.match(f.name).group(1))})
             for f in nexus_files_list #Build the generator for each required file
             ),  axis=1).T #Have now concatenated a single df (along axis 1).  Transpose it.
+    
     missing = nexuses_flows_df[ nexuses_flows_df.isna().any(axis=1) ]
     if  not missing.empty:
         raise ValueError("The following nexus inputs are incomplete: "+str(missing.index))
     rt1 = time.time()
     #print("Time to build nexus_flows_df: {} seconds".format(rt1-rt0))
 
-    qlat_df = pd.concat( (nexuses_flows_df.loc[int(k)].rename(index={int(k):v})
+    #qlat_df = pd.concat( (nexuses_flows_df.loc[int(k)].rename(index={int(k):v})
+    #    for k,v in nexus_to_downstream_flowpath_dict.items() ), axis=1
+    #    ).T
+    
+    # qlat to stream segments entering each assigned nexus points
+    qlat_df = pd.concat( (nexuses_flows_df.loc[int(k)].rename(v)
         for k,v in nexus_to_downstream_flowpath_dict.items() ), axis=1
         ).T
-    
+
     # The segment_index has the full network set of segments/flowpaths. 
     # Whereas the set of flowpaths that are downstream of nexuses is a 
     # subset of the segment_index. Therefore, all of the segments/flowpaths
     # that are not accounted for in the set of flowpaths downstream of
     # nexuses need to be added to the qlateral dataframe and padded with
     # zeros.
+   
+    #all_df = pd.DataFrame( np.zeros( (len(segment_index), len(qlat_df.columns)) ), index=segment_index,
+    #        columns=qlat_df.columns )
+   
+    #all_df.loc[ qlat_df.index ] = qlat_df
 
-    #tq0 = time.time()
-    all_df = pd.DataFrame( np.zeros( (len(segment_index), len(qlat_df.columns)) ), index=segment_index,
-            columns=qlat_df.columns )
-
-    all_df.loc[ qlat_df.index ] = qlat_df
-
-    #tq1 =  time.time()
-    #print("Time to fill null qlats: {}".format(tq1-tq0))
-    # Sort qlats
-    qlat_df = all_df.sort_index()
+    #qlat_df = all_df.sort_index()
 
     # Set new nts based upon total nexus inputs
-    nts = (qlat_df.shape[1]) * qts_subdivisions
+    #nts = (qlat_df.shape[1]) * qts_subdivisions
+    #max_col = 1 + nts // qts_subdivisions
 
-    max_col = 1 + nts // qts_subdivisions
-
+    # temporary time steps manipulation    
+    dt      = 300 # [sec]
+    dt_qlat = 3600 # [sec]
+    nts     = 24 # steps
+    max_col = math.ceil(nts*dt/dt_qlat)
+    
     if len(qlat_df.columns) > max_col:
         qlat_df.drop(qlat_df.columns[max_col:], axis=1, inplace=True)
 
@@ -202,6 +211,7 @@ class HYFeaturesNetwork(AbstractNetwork):
         break_points = {"break_network_at_waterbodies": break_network_at_waterbodies,
                         "break_network_at_gages": break_network_at_gages}
         file_type = Path(geo_file_path).suffix
+        
         if(  file_type == '.gpkg' ):
             self._dataframe = read_geopkg(geo_file_path)
             #df["NHDWaterbodyComID"].fillna(-9999, inplace=True)
@@ -221,20 +231,26 @@ class HYFeaturesNetwork(AbstractNetwork):
         #Don't need the string prefix anymore, drop it
         mask = ~ self._dataframe['toid'].str.startswith("tnex")
         self._dataframe = self._dataframe.apply(numeric_id, axis=1)
+                
         #make the flowpath linkage, ignore the terminal nexus
         self._flowpath_dict = dict(zip(self._dataframe.loc[mask].toid, self._dataframe.loc[mask].id))
         self._waterbody_types_df = pd.DataFrame()
         self._waterbody_df = pd.DataFrame()
+        
         #FIXME the base class constructor is finiky
         #as it requires the _dataframe, then sets some 
         #initial default properties...which, at the moment
         #are used by the subclass constructor.
+        
         #So it needs to be called at just the right spot...
         super().__init__(cols, terminal_code, break_points)
+        
         #FIXME once again, order here can hurt....to hack `alt` in, either need to
         #put it as a column in the config, or do this AFTER the super constructor
         #otherwise the alt column gets sliced out...
         self._dataframe['alt'] = 1.0 #FIXME get the right value for this...
+       
+    
         #Load waterbody/reservoir info
         #For ngen HYFeatures, the reservoirs to be simulated
         #are determined by the lake.json file
@@ -335,6 +351,9 @@ class HYFeaturesNetwork(AbstractNetwork):
           print("... in %s seconds." % (time.time() - start_time))
         
         self._qlateral = read_qlats(forcing_parameters, self._dataframe.index, self.downstream_flowpath_dict)
+        #test
+        #self._qlateral = 100.0 
+        
         #Mask out all non-simulated waterbodies
         self._dataframe['waterbody'] = self.waterbody_null
         #This also remaps the initial NHDComID identity to the HY_Features Waterbody ID for the reservoir...

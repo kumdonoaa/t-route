@@ -249,7 +249,7 @@ def compute_nhd_routing_v02(
     waterbody_type_specified,
     subnetwork_list,
 ):
-
+    
     da_decay_coefficient = da_parameter_dict.get("da_decay_coefficient", 0)
     param_df["dt"] = dt
     param_df = param_df.astype("float32")
@@ -257,7 +257,6 @@ def compute_nhd_routing_v02(
     start_time = time.time()
     compute_func = _compute_func_map[compute_func_name]
     if parallel_compute_method == "by-subnetwork-jit-clustered":
-        
         # Create subnetwork objects if they have not already been created
         if not subnetwork_list[0] or not subnetwork_list[1]:
             networks_with_subnetworks_ordered_jit = nhd_network.build_subnetworks(
@@ -309,7 +308,6 @@ def compute_nhd_routing_v02(
 
             cluster_threshold = 0.65  # When a job has a total segment count 65% of the target size, compute it
             # Otherwise, keep adding reaches.
-
             reaches_ordered_bysubntw_clustered = defaultdict(dict)
 
             for order in subnetworks_only_ordered_jit:
@@ -357,10 +355,9 @@ def compute_nhd_routing_v02(
             # altered before being returned
             subnetwork_list = [subnetworks_only_ordered_jit, reaches_ordered_bysubntw_clustered]
             subnetwork_list = copy.deepcopy(subnetwork_list)
-
         else:
             subnetworks_only_ordered_jit, reaches_ordered_bysubntw_clustered = copy.deepcopy(subnetwork_list)
-        
+
         if 1 == 1:
             LOG.info("JIT Preprocessing time %s seconds." % (time.time() - start_time))
             LOG.info("starting Parallel JIT calculation")
@@ -423,7 +420,7 @@ def compute_nhd_routing_v02(
                     else:
                         lake_segs = []
                         waterbodies_df_sub = pd.DataFrame()
-
+ 
                     param_df_sub = param_df.loc[
                         common_segs,
                         ["dt", "bw", "tw", "twcc", "dx", "n", "ncc", "cs", "s0", "alt"],
@@ -483,7 +480,7 @@ def compute_nhd_routing_v02(
                         t0,
                         offnetwork_upstreams
                     )
-                    
+                    import pdb; pdb.set_trace()
                     # results_subn[order].append(
                     #     compute_func(
                     jobs.append(
@@ -543,9 +540,9 @@ def compute_nhd_routing_v02(
                             return_courant,
                         )
                     )
-
+                import pdb; pdb.set_trace()
                 results_subn[order] = parallel(jobs)
-   
+                import pdb; pdb.set_trace()
                 if order > 0:  # This is not needed for the last rank of subnetworks
                     flowveldepth_interorder = {}
                     for ci, (cluster, clustered_subns) in enumerate(

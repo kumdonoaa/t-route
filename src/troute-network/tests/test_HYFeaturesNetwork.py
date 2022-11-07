@@ -13,8 +13,10 @@ Fixtures for setting up various components for testing
 
 def supernetwork_parameters(type):
     if( type == 'gpkg'):
-       geo_file =  _workdir.joinpath("data/hy_network.gpkg")
-       edge_list = None
+       #geo_file =  _workdir.joinpath("data/hy_network.gpkg")
+        geo_file =  _workdir.joinpath("data/gauge_01069700.gpkg")
+        #geo_file =  _workdir.joinpath("data/gauge_01013500.gpkg")        
+        edge_list = None
     elif( type == 'json'):
         geo_file =  _workdir.joinpath("data/flowpath_attributes.json")
         edge_list = _workdir.joinpath("data/flowpath_edge_list.json")
@@ -29,7 +31,8 @@ def supernetwork_parameters(type):
             "dx": "lengthkm",
             "n": "n",  # TODO: rename to `manningn`
             "ncc": "nCC",  # TODO: rename to `mannningncc`
-            "s0": "slope_percent",  # TODO: rename to `bedslope`
+            #"s0": "slope_percent",  # TODO: rename to `bedslope`
+            "s0": "So",
             "bw": "BtmWdth",  # TODO: rename to `bottomwidth`
             #waterbody: "NHDWaterbodyComID",
             "tw": "TopWdth",  # TODO: rename to `topwidth`
@@ -67,7 +70,7 @@ def network(request, waterbody_parameters, restart_parameters, forcing_parameter
     type = request.param
     return HYFeaturesNetwork(supernetwork_parameters(type), waterbody_parameters, restart_parameters, forcing_parameters, verbose=True, showtiming=False)
 
-@pytest.mark.parametrize("network",["gpkg", "json"], indirect=True)
+@pytest.mark.parametrize("network",["gpkg"], indirect=True)
 def test_init(network):
     #This isn't really nessicary since init is done by the fixture
     #errors in init will be caught and shown in the test
@@ -76,26 +79,28 @@ def test_init(network):
     pass
 
 #@pytest.skip #compute_nhd_routing_v02 has some additonal args that need to be considered
-@pytest.mark.parametrize("network",["gpkg", "json"], indirect=True )
+@pytest.mark.parametrize("network",["gpkg"], indirect=True )
 def test_routable(network, waterbody_parameters):
         #This is really more of an integration test
         #but it is here to ensure that the data structure works as intended
         #when passed off to the router
         compute_func = "V02-structured"
-
+        subnetwork_list = [None, None, None]        
+        import pdb; pdb.set_trace()
+        
         results = compute_nhd_routing_v02(
         network.connections,
         network.reverse_network,
         network.waterbody_connections,
         network.reaches_by_tailwater,
         compute_func,
-        "by-network",
+        "by-subnetwork-jit-clustered",
         1,
         # The default here might be the whole network or some percentage...
         None,
         network.qlateral.iloc[0].index[0], #t0???
         300, #dt
-        40, #nts
+        24, #nts
         12, #qts_subs
         network.independent_networks,
         network.dataframe,
@@ -114,5 +119,7 @@ def test_routable(network, waterbody_parameters):
         waterbody_parameters,  # TODO: Can we remove the dependence on this input? It's like passing argv down into the compute kernel -- seems like we can strip out the specifically needed items.
         network.waterbody_types_dataframe,
         not network.waterbody_types_dataframe.index.empty,
-        {},
-    )
+        subnetwork_list,
+        )
+        import pdb; pdb.set_trace()
+        test = results

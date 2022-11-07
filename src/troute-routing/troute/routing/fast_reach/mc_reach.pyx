@@ -219,11 +219,15 @@ cpdef object compute_network_structured(
         This version creates python objects for segments and reaches,
         but then uses only the C structures and access for efficiency
     """
+    import pdb; pdb.set_trace()
     # Check shapes
+    '''
     if qlat_values.shape[0] != data_idx.shape[0]:
         raise ValueError(f"Number of rows in Qlat is incorrect: expected ({data_idx.shape[0]}), got ({qlat_values.shape[0]})")
     if qlat_values.shape[1] < nsteps:
         raise ValueError(f"Number of columns (timesteps) in Qlat is incorrect: expected at most ({data_idx.shape[0]}), got ({qlat_values.shape[1]}). The number of columns in Qlat must be equal to or less than the number of routing timesteps")
+    ''' 
+    
     if data_values.shape[0] != data_idx.shape[0] or data_values.shape[1] != data_cols.shape[0]:
         raise ValueError(f"data_values shape mismatch")
     #define and initialize the final output array, add one extra time step for initial conditions
@@ -563,7 +567,7 @@ cpdef object compute_network_structured(
                 #Create compute reach kernel input buffer
                 for _i in range(r.reach.mc_reach.num_segments):
                     segment = get_mc_segment(r, _i)#r._segments[_i]
-                    buf_view[_i, 0] = qlat_array[ segment.id, <int>((timestep-1)/qts_subdivisions)]
+                    buf_view[_i, 0] = qlat_array[ segment.id, <int>((timestep-1)/qts_subdivisions)]                    
                     buf_view[_i, 1] = segment.dt
                     buf_view[_i, 2] = segment.dx
                     buf_view[_i, 3] = segment.bw
@@ -576,6 +580,10 @@ cpdef object compute_network_structured(
                     buf_view[_i, 10] = flowveldepth[segment.id, timestep-1, 0]
                     buf_view[_i, 11] = 0.0 #flowveldepth[segment.id, timestep-1, 1]
                     buf_view[_i, 12] = flowveldepth[segment.id, timestep-1, 2]
+                    with open("qlat_array_mc_reach.txt",'a') as qlatarray_mc:    
+                        qlatarray_mc.write("%s %s %s\n" %\
+                                (str(segment.id), str(<int>((timestep-1)*dt/3600.0)), 
+                                 str(qlat_array[ segment.id, <int>((timestep-1)*dt/3600.0)])))      
 
                 compute_reach_kernel(previous_upstream_flows, upstream_flows,
                                      r.reach.mc_reach.num_segments, buf_view,
