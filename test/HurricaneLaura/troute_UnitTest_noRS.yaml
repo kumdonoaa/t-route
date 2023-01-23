@@ -9,6 +9,7 @@ network_topology_parameters:
     #----------
     supernetwork_parameters:
         #----------
+        geo_file_type: NHDNetwork
         geo_file_path: domain/RouteLink_NWMv2.1.nc  
         mask_file_path: domain/unit_test_noRS/coastal_subset.txt
         synthetic_wb_segments:

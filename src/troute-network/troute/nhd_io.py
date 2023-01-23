@@ -681,13 +681,11 @@ def write_to_netcdf(f, variables, datatype = 'f4'):
     NOTES:
     - the netCDF files we want to append/edit must have write permission!
     '''
-    
     with netCDF4.Dataset(
         filename = f,
         mode = 'r+',
         format = "NETCDF4"
     ) as ds:
-
         for varname, (vardata, dim, attrs) in variables.items():
             
             # check that dimension exists
@@ -773,19 +771,28 @@ def write_chrtout(
         
         LOG.debug("Writing t-route data to %d CHRTOUT files" % (nfiles_to_write))
         start = time.time()
-        with Parallel(n_jobs=cpu_pool) as parallel:
-        
-            jobs = []
+        try:
+            with Parallel(n_jobs=cpu_pool) as parallel:
+                jobs = []
+                for i, f in enumerate(chrtout_files[:nfiles_to_write]):
+
+                    s = time.time()
+                    variables = {
+                        varname: (qtrt[:,i], dim, attrs)
+                    }
+                    jobs.append(delayed(write_to_netcdf)(f, variables))
+                    #LOG.debug("Writing %s." % (f))
+    
+                parallel(jobs)
+        except:
             for i, f in enumerate(chrtout_files[:nfiles_to_write]):
 
                 s = time.time()
                 variables = {
-                    varname: (qtrt[:,i], dim, attrs)
-                }
-                jobs.append(delayed(write_to_netcdf)(f, variables))
+                        varname: (qtrt[:,i], dim, attrs)
+                    }
+                write_to_netcdf(f, variables)
                 LOG.debug("Writing %s." % (f))
-                
-            parallel(jobs)
                
         LOG.debug("Writing t-route data to %d CHRTOUT files took %s seconds." % (nfiles_to_write, (time.time() - start)))
         
