@@ -140,7 +140,6 @@ def _read_config_file(custom_input_file):
     '''
     with open(custom_input_file) as custom_file:
         data = yaml.load(custom_file, Loader=yaml.SafeLoader)
-
     troute_configuration = Config(**data)
     config_dict = troute_configuration.dict()
 

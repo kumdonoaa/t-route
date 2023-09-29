@@ -262,8 +262,7 @@ class HYFeaturesNetwork(AbstractNetwork):
             print("supernetwork connections set complete")
         if self.showtiming:
             print("... in %s seconds." % (time.time() - start_time))
-            
-
+ 
         super().__init__()   
             
         # Create empty dataframe for coastal_boundary_depth_df. This way we can check if
@@ -302,7 +301,6 @@ class HYFeaturesNetwork(AbstractNetwork):
     
     def preprocess_network(self, flowpaths):
         self._dataframe = flowpaths
-
         # Don't need the string prefix anymore, drop it
         mask = ~ self.dataframe['toid'].str.startswith("tnex") 
         self._dataframe = self.dataframe.apply(numeric_id, axis=1)
@@ -512,7 +510,7 @@ class HYFeaturesNetwork(AbstractNetwork):
             if rfc_da:
                 #FIXME: Temporary fix, read in predefined rfc lake gage crosswalk file for rfc reservoirs.
                 # Replace relevant waterbody_types as type 4.
-                rfc_lake_gage_crosswalk = pd.read_csv('/home/sean.horvath/projects/t-route/test/ngen/rfc_lake_gage_crosswalk.csv')
+                rfc_lake_gage_crosswalk = pd.read_csv('/home/dongha.kim/github/t-route/test/ngen/rfc_lake_gage_crosswalk.csv')
                 self._rfc_lake_gage_crosswalk = rfc_lake_gage_crosswalk[rfc_lake_gage_crosswalk['rfc_lake_id'].isin(self.waterbody_dataframe.index)].set_index('rfc_lake_id')
                 self._waterbody_types_df.loc[self._rfc_lake_gage_crosswalk.index,'reservoir_type'] = 4
             
