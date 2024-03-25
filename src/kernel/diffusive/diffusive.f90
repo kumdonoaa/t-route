@@ -219,7 +219,7 @@ contains
     double precision, dimension(:,:), allocatable :: used_lfrac    
     double precision, dimension(:,:,:), allocatable :: temp_q_ev_g
     double precision, dimension(:,:,:), allocatable :: temp_elv_ev_g    
-
+    open(1,FILE="identify_badtopobathy_segment.txt",STATUS='unknown')
   !-----------------------------------------------------------------------------
   ! Time domain parameters
     dtini        = timestep_ar_g(1) ! initial timestep duration [sec]
@@ -425,6 +425,7 @@ contains
     do jm = 1, nmstem_rch !* mainstem reach only
       j = mstem_frj(jm)
       do i = 1, frnw_g(j, 1)
+        write(1,*) i, j
         call readXsection_natural_mann_vertices(i, j, timesDepth)
       end do
     end do

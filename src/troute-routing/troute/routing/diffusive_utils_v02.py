@@ -875,6 +875,16 @@ def diffusive_input_data_v02(
 
     # covert data type from integer to float for frnw  
     dfrnw_g = frnw_g.astype('float')    
+
+    # print python-fortran network crosswalk map
+    df1 = pd.DataFrame(frnw_g)
+    new_col_names = ['# of compute nodes', 'j of ds.reach', '# of us.reaches'] + ['j of us.reach']*(df1.shape[1]-3)
+    df1.columns = new_col_names
+    df1 = df1.rename_axis('reach j')
+    df2 = pd.DataFrame(list(pynw.items()), columns=['reach j', 'segment ID'])
+    df_joined = pd.concat([df2, df1], axis=1)
+    df_joined.to_csv('python-fortran network crosswalk map.txt', index=False)
+    
     # ---------------------------------------------------------------------------------
     #                              Step 0-5
     #                  Prepare channel geometry data
@@ -998,7 +1008,7 @@ def diffusive_input_data_v02(
                                                                            mxncomp_g, 
                                                                            nrch_g,
                                                                            dbfksegID)
-                   
+   
     # ---------------------------------------------------------------------------------------------
     #                              Step 0-11
 
