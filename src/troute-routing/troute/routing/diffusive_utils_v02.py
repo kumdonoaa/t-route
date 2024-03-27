@@ -881,9 +881,16 @@ def diffusive_input_data_v02(
     new_col_names = ['# of compute nodes', 'j of ds.reach', '# of us.reaches'] + ['j of us.reach']*(df1.shape[1]-3)
     df1.columns = new_col_names
     df1 = df1.rename_axis('reach j')
+    df1.index += 1 # be compatible with fortran number count starting from 1
     df2 = pd.DataFrame(list(pynw.items()), columns=['reach j', 'segment ID'])
-    df_joined = pd.concat([df2, df1], axis=1)
-    df_joined.to_csv('python-fortran network crosswalk map.txt', index=False)
+    df2.set_index('reach j',inplace=True)
+    df2.index += 1 # be compatible with fortran number count starting from 1
+    #df_joined = pd.concat([df2, df1], axis=1)
+    df_joined = df1.merge(df2, left_index=True, right_index=True)
+    columns = list(df_joined.columns)
+    columns = [columns[-1]] + columns[:-1]
+    df_joined = df_joined[columns]
+    df_joined.to_csv('python-fortran network crosswalk map.txt', index=True)
     
     # ---------------------------------------------------------------------------------
     #                              Step 0-5
