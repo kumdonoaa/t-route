@@ -211,31 +211,34 @@ class MCwithDiffusive(AbstractRouting):
                 all_links = all_links + diffusive_domain_all[twlink_mainstem]['links']
 
         self._diffusive_domain = diffusive_domain_all
-        
-        # Load topobathy data and remove any links for which topo data cannot be obtained
-        topobathy_df = self.topobathy_df
-        missing_topo_ids = list(set(all_links).difference(set(topobathy_df.index)))
-        topo_df_list = []
-        
-        for key in missing_topo_ids:
-            topo_df_list.append(_fill_in_missing_topo_data(key, dataframe, topobathy_df))
-        
-        if len(topo_df_list)==0: 
-            new_topo_df = pd.DataFrame() 
-        else:
-            new_topo_df = pd.concat(topo_df_list)
 
-        bad_links = list(set(missing_topo_ids).difference(set(new_topo_df.index)))
-        self._topobathy_df = pd.concat([self.topobathy_df,new_topo_df])
-        
-        # select topo data with minimum value of cs_id for each segment
-        df =  self._topobathy_df
-        min_cs_id=df.reset_index().groupby('hy_id')['cs_id'].transform('min')
-        mask = df.reset_index()['cs_id'] == min_cs_id
-        single_topo_df = df.reset_index()[mask]
-        single_topo_df.set_index('hy_id', inplace=True)
-        self._topobathy_df= single_topo_df
-           
+        # Load topobathy data and remove any links for which topo data cannot be obtained
+        if self.hybrid_params['use_natl_xsections']:
+            topobathy_df = self.topobathy_df
+            missing_topo_ids = list(set(all_links).difference(set(topobathy_df.index)))
+            topo_df_list = []
+            
+            for key in missing_topo_ids:
+                topo_df_list.append(_fill_in_missing_topo_data(key, dataframe, topobathy_df))
+            
+            if len(topo_df_list)==0: 
+                new_topo_df = pd.DataFrame() 
+            else:
+                new_topo_df = pd.concat(topo_df_list)
+
+            bad_links = list(set(missing_topo_ids).difference(set(new_topo_df.index)))
+            self._topobathy_df = pd.concat([self.topobathy_df,new_topo_df])
+            
+            # select topo data with minimum value of cs_id for each segment
+            df =  self._topobathy_df
+            min_cs_id=df.reset_index().groupby('hy_id')['cs_id'].transform('min')
+            mask = df.reset_index()['cs_id'] == min_cs_id
+            single_topo_df = df.reset_index()[mask]
+            single_topo_df.set_index('hy_id', inplace=True)
+            self._topobathy_df= single_topo_df
+        else:
+            bad_links = []
+
         for tw in self._diffusive_domain:
             #mainstem_segs = self._diffusive_domain[tw]['links']
             
