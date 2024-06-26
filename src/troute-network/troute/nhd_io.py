@@ -1377,7 +1377,7 @@ def write_lite_restart(
     -----------
         
     '''
-    
+    import pdb; pdb.set_trace()
     output_directory = restart_parameters.get('lite_restart_output_directory', None)
     if output_directory:
         
@@ -1388,7 +1388,7 @@ def write_lite_restart(
         t0_str = t0.strftime("%Y%m%d%H%M")
         channel_restart_filename = 'channel_restart_'+t0_str
         waterbody_restart_filename = 'waterbody_restart_'+t0_str
-        
+        import pdb; pdb.set_trace()
         q0_out = q0.copy()
         q0_out['time'] = t0
         q0_out.to_pickle(pathlib.Path.joinpath(output_path, channel_restart_filename))

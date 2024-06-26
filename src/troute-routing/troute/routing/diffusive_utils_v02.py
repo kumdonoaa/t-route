@@ -597,7 +597,7 @@ def fp_coastal_boundary_input_map(
     nts_db_g        -- (int) number of coastal boundary input data timesteps
     dbcd_g          -- (float) coastal boundary input data time series [m]
     """    
-    
+
     if not coastal_boundary_depth_df.empty:   
         # date_time_obj1 = datetime.strptime(coastal_boundary_depth_df.columns[1], '%Y-%m-%d %H:%M:%S')
         # date_time_obj0 = datetime.strptime(coastal_boundary_depth_df.columns[0], '%Y-%m-%d %H:%M:%S')
@@ -628,7 +628,7 @@ def fp_coastal_boundary_input_map(
                                                 unstack(1, fill_value = np.nan)['depth'])
             
             timeslice_dbcd_list.append(timeslice_dbcd)                         
-
+        import pdb; pdb.set_trace()
         dbcd_df = pd.concat(timeslice_dbcd_list, axis=1, ignore_index=False)
         
         # replace zero or negative water depth by the smallest postive value
@@ -890,6 +890,21 @@ def diffusive_input_data_v02(
     # covert data type from integer to float for frnw  
     dfrnw_g = frnw_g.astype('float')    
 
+    # print python-fortran network crosswalk map
+    df1 = pd.DataFrame(frnw_g)
+    new_col_names = ['# of compute nodes', 'j of ds.reach', '# of us.reaches'] + ['j of us.reach']*(df1.shape[1]-3)
+    df1.columns = new_col_names
+    df1 = df1.rename_axis('reach j')
+    df1.index += 1 # be compatible with fortran number count starting from 1
+    df2 = pd.DataFrame(list(pynw.items()), columns=['reach j', 'segment ID'])
+    df2.set_index('reach j',inplace=True)
+    df2.index += 1 # be compatible with fortran number count starting from 1
+    df_joined = df1.merge(df2, left_index=True, right_index=True)
+    last_column = df_joined.columns[-1]
+    last_column_data = df_joined.pop(last_column)
+    df_joined.insert(0, last_column, last_column_data)
+    df_joined.to_csv('python-fortran network crosswalk map.txt', index=True)
+
     # ---------------------------------------------------------------------------------
     #                              Step 0-5
     #                  Prepare channel geometry data
@@ -981,7 +996,6 @@ def diffusive_input_data_v02(
     
     timestep_ar_g[6] = dt_db_g
     para_ar_g[10] = dsbd_option  # downstream water depth boundary condition: 1: given water depth data, 2: normal depth    
-   
     # ---------------------------------------------------------------------------------------------
     #                              Step 0-9-2
 
@@ -998,7 +1012,7 @@ def diffusive_input_data_v02(
                 # TODO - if one of the tributary segments is a waterbody, it's initial conditions
                 # will not be in the initial_conditions array, but rather will be in the waterbodies_df array
                 qtrib_g[0,frj] = initial_conditions.loc[head_segment, 'qu0']    
-  
+    import pdb; pdb.set_trace()
     # ---------------------------------------------------------------------------------
     #                              Step 0-10
 
@@ -1042,7 +1056,7 @@ def diffusive_input_data_v02(
     #                       Build input dictionary
     # ---------------------------------------------------------------------------------
     ntss_ev_g = int((tfin_g - t0_g) * 3600.0 / dt) + 1
-
+    import pdb; pdb.set_trace()
     # build a dictionary of diffusive model inputs and helper variables
     diff_ins = {}
     if not refactored_diffusive_domain:

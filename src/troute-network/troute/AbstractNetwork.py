@@ -140,7 +140,7 @@ class AbstractNetwork(ABC):
         if self._coastal_boundary_depth_df.empty:
             coastal_boundary_elev_files = self.forcing_parameters.get('coastal_boundary_input_file', None) 
             coastal_boundary_domain_files = self.hybrid_parameters.get('coastal_boundary_domain', None)    
-            
+
             if coastal_boundary_elev_files:
                 start_time = time.time()    
                 LOG.info("creating coastal dataframe ...")
@@ -317,9 +317,12 @@ class AbstractNetwork(ABC):
         self._segment_index = self.dataframe.index
         if self._routing.diffusive_network_data:
             for tw in self._routing.diffusive_network_data:
-                self._segment_index = self._segment_index.append(
-                    pd.Index(self._routing.diffusive_network_data[tw]['mainstem_segs'])
-                )
+                unique_index = pd.Index(self._routing.diffusive_network_data[tw]['mainstem_segs']).difference(self._segment_index)
+                self._segment_index = self._segment_index.append(unique_index)
+            #    self._segment_index = self._segment_index.append(
+            #        pd.Index(self._routing.diffusive_network_data[tw]['mainstem_segs'])
+            #    )
+            
         return self._segment_index
     
     @property
@@ -975,7 +978,7 @@ def read_file(file_name):
 def read_DFlow_output(ds):
     df = ds[['waterlevel','bedlevel']].to_dataframe()
     df['depth'] = df['waterlevel'] - df['bedlevel']
-    df['station_name'] = df['station_name'].str.decode('utf-8').str.split(' / ',expand=True).loc[:,1].astype(float).astype(int)
+    df['station_name'] = df['station_name'].str.decode('utf-8').str.split('/',expand=True).loc[:,1].astype(float).astype(int)
     df = df.reset_index()[['time','station_name','depth']].set_index(['station_name', 'time']).unstack('time', fill_value = np.nan)['depth']
     return df
 

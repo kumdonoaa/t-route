@@ -221,7 +221,10 @@ contains
     double precision, dimension(:,:), allocatable :: used_lfrac    
     double precision, dimension(:,:,:), allocatable :: temp_q_ev_g
     double precision, dimension(:,:,:), allocatable :: temp_elv_ev_g    
-
+ 
+    open(1,FILE="check_time_steps.txt",STATUS='unknown')
+    open(2,FILE="write_output2tributary.txt",STATUS='unknown')
+    open(3,FILE="write_output.txt",STATUS='unknown')
   !-----------------------------------------------------------------------------
   ! Time domain parameters
     dtini         = timestep_ar_g(1)    ! initial timestep duration [sec]
@@ -489,8 +492,9 @@ contains
   ! and tributary flow
 
     ! time step series for lateral flow. 
-    ! ** ql from t-route starts from the first time step. For example, when t0 and tfin = 0 and 2 hrs with dt=300 sec,
-    ! ** ql values from t-route starts at 5, 10, 15, ..., 120 min.
+    ! ** ql from t-route starts from the initial time step t0. For example, when t0 and tfin = 0 and 2 hrs,
+    ! ** ql values from t-route are at 0 and 60 min. But, in this diffusive, ql_diff(t=0)=ql_diff(t=60) <- ql(t=60) and
+    ! ** ql_diff(t=120) <- ql(t=60) 
     do n = 1, nts_ql_g
       tarr_ql(n+1) =    t0 * 60.0 + dt_ql * &
                       real(n, KIND(dt_ql)) / 60.0 ! [min]
@@ -509,21 +513,24 @@ contains
     do n=1, nts_qtrib_g
       tarr_qtrib(n) = t0 * 60.0 + dt_qtrib * &
                       real(n-1,KIND(dt_qtrib)) / 60.0 ! [min]
+      write(1,*) "tarr_qtrib:", n, tarr_qtrib(n)
     end do
-    
+     
     ! use tailwater downstream boundary observations
     ! needed for coastal coupling
     ! **** COMING SOON ****
     ! time step series for downstream boundary data
     do n=1, nts_db_g
         tarr_db(n) = t0 * 60.0 + dt_db * &
-                      real(n-1,KIND(dt_db)) / 60.0 ! [min]                 
+                      real(n-1,KIND(dt_db)) / 60.0 ! [min]  
+        write(1,*) "tarr_db:", n, tarr_db(n)               
     end do
     
     ! time step series for data assimilation for discharge at bottom node of a related reach
     do n=1, nts_da
         tarr_da(n) = t0 * 60.0 + dt_da * &
                       real(n-1,KIND(dt_da)) / 60.0 ! [min]
+        write(1,*) "tarr_da:", n, tarr_da(n)  
     end do
 
   !-----------------------------------------------------------------------------
@@ -540,6 +547,7 @@ contains
         ! **** COMING SOON **** 
           do n = 1, nts_db_g
             varr_db(n) = dbcd(n) + z(ncomp, j) !* when dbcd is water depth [m], channel bottom elev is added.
+            write(1,*) "dbcd:", n, dbcd(n)
           end do
           t              = t0 * 60.0
           oldY(ncomp, j) = intp_y(nts_db_g, tarr_db, varr_db, t)
@@ -595,10 +603,12 @@ contains
           if (all(mstem_frj /= j)) then ! NOT a mainstem reach
             do n = 1, nts_qtrib_g
               varr_qtrib(n) = qtrib_g(n, j)
+              write(1,*) "qtrib_g:", n, j, qtrib_g(n, j)
             end do
             q_ev_g(ts_ev, frnw_g(j, 1), j) = intp_y(nts_qtrib_g, tarr_qtrib, &
                                                       varr_qtrib, t)
             q_ev_g(ts_ev,            1, j) = q_ev_g(ts_ev, frnw_g(j, 1), j)            
+            write(2,*) t, ts_ev, j, q_ev_g(ts_ev, frnw_g(j, 1), j)
           end if
         end do
         ts_ev = ts_ev + 1
@@ -796,7 +806,7 @@ contains
             elv_ev_g(ts_ev + 1, i, j)   = newY(i, j)
             depth_ev_g(ts_ev + 1, i, j) = elv_ev_g(ts_ev + 1, i, j) - z(i, j)
           end do
-              
+          write(3,*) t, ts_ev+1, j
           !* water elevation for tributaries flowing into the mainstem in the middle or at the upper end
           do k = 1, frnw_g(j, 3)
             usrchj = frnw_g(j, 3 + k)
@@ -822,7 +832,7 @@ contains
             elv_ev_g(1, i, j)   = oldY(i, j)
             depth_ev_g(1, i, j) = elv_ev_g(1, i, j) - z(i, j)
           end do
-              
+          write(3,*) "initial output:", t, ts_ev, j
           !* water elevation for tributaries flowing into the mainstem in the middle or at the upper end
           do k = 1, frnw_g(j, 3) !* then number of upstream reaches
             usrchj = frnw_g(j, 3 + k) !* js corresponding to upstream reaches

@@ -609,7 +609,6 @@ class HYFeaturesNetwork(AbstractNetwork):
             self._rfc_lake_gage_crosswalk = pd.DataFrame()
     
     def build_qlateral_array(self, run,):
-        
         # TODO: set default/optional arguments
         qts_subdivisions = run.get("qts_subdivisions", 1)
         nts = run.get("nts", 1)
@@ -655,7 +654,7 @@ class HYFeaturesNetwork(AbstractNetwork):
             
                 # lateral flows [m^3/s] are stored at NEXUS points with NEXUS ids
                 nexuses_lateralflows_df = pd.concat(dfs, axis=1) 
-            
+
             # Take flowpath ids entering NEXUS and replace NEXUS ids by the upstream flowpath ids
             qlats_df = nexuses_lateralflows_df.rename(index=self.downstream_flowpath_dict)
             qlats_df = qlats_df[qlats_df.index.isin(self.segment_index)]

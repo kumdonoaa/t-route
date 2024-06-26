@@ -119,7 +119,7 @@ def main_v04(argv):
 
     # Create forcing data within network object for first loop iteration
     network.assemble_forcings(run_sets[0],)
-    
+    import pdb; pdb.set_trace()
     # Create data assimilation object from da_sets for first loop iteration
     data_assimilation = DataAssimilation(
         network,
@@ -130,7 +130,7 @@ def main_v04(argv):
         value_dict=None,
         da_run=da_sets[0],
         )
-
+    import pdb; pdb.set_trace()
     if showtiming:
         forcing_end_time = time.time()
         task_times['forcing_time'] += forcing_end_time - network_end_time
@@ -141,7 +141,7 @@ def main_v04(argv):
     compute_kernel = compute_parameters.get("compute_kernel", "V02-caching")
     assume_short_ts = compute_parameters.get("assume_short_ts", False)
     return_courant = compute_parameters.get("return_courant", False)
-        
+
     # Pass empty subnetwork list to nwm_route. These objects will be calculated/populated
     # on first iteration of for loop only. For additional loops this will be passed
     # to function from inital loop.     
@@ -1104,6 +1104,9 @@ def nwm_route(
         waterbody_types_df,
         waterbody_type_specified,
         subnetwork_list,
+        diffusive_network_data,
+        topobathy_df,
+        coastal_boundary_depth_df,
         flowveldepth_interorder,
         from_files = from_files,
     )
