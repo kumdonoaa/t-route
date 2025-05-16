@@ -88,10 +88,12 @@ class NudgingDA(AbstractDA):
         # determine if user explictly requests streamflow DA
         nudging = False
         if streamflow_da_parameters:
-            nudging = streamflow_da_parameters.get('streamflow_nudging', False)
+            nudging = (streamflow_da_parameters.get('streamflow_nudging', False)
+                       or streamflow_da_parameters.get('simple_scaling', False)
+                      )
             
             da_parameter_dict["diffusive_streamflow_nudging"] = streamflow_da_parameters.get("diffusive_streamflow_nudging", False)
-        
+
         self._da_parameter_dict = da_parameter_dict
 
         self._last_obs_df = pd.DataFrame()
@@ -245,7 +247,7 @@ class NudgingDA(AbstractDA):
         streamflow_da_parameters = self._data_assimilation_parameters.get('streamflow_da', None)
 
         if streamflow_da_parameters:
-            if streamflow_da_parameters.get('streamflow_nudging', False):
+            if streamflow_da_parameters.get('streamflow_nudging', False) or streamflow_da_parameters.get('simple_scaling', False):
                 self._last_obs_df = new_lastobs(run_results, time_increment)
 
     def update_for_next_loop(self, network, da_run,):
@@ -270,7 +272,7 @@ class NudgingDA(AbstractDA):
         # update usgs_df if it is not empty
         streamflow_da_parameters = data_assimilation_parameters.get('streamflow_da', None)
         
-        if streamflow_da_parameters.get('streamflow_nudging', False):
+        if streamflow_da_parameters.get('streamflow_nudging', False) or streamflow_da_parameters.get('simple_scaling', False):
             self._usgs_df = _create_usgs_df(data_assimilation_parameters, streamflow_da_parameters, run_parameters, network, da_run)
             if ('canada_timeslice_files' in da_run) & (not network.canadian_gage_df.empty):
                 self._canada_df = _create_canada_df(data_assimilation_parameters, streamflow_da_parameters, run_parameters, network, da_run)
@@ -1130,7 +1132,7 @@ def _create_usgs_df(data_assimilation_parameters, streamflow_da_parameters, run_
     usgs_timeslices_folder = pathlib.Path(usgs_timeslices_folder)
     usgs_files = [usgs_timeslices_folder.joinpath(f) for f in 
                   da_run['usgs_timeslice_files']]
-	
+
     if usgs_files:
         usgs_df = (
             nhd_io.get_obs_from_timeslices(

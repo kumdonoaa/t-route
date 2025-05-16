@@ -523,7 +523,6 @@ def dfs_decomposition(N, path_func, source_nodes=None):
     (List): List of reaches to be processed in order.
     
     """
-
     if source_nodes is None:
         source_nodes = headwaters(N)
 

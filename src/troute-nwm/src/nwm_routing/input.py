@@ -58,7 +58,7 @@ def _input_handler_v04(args):
     hybrid_parameters = compute_parameters.get('hybrid_parameters')
     parity_parameters = output_parameters.get('wrf_hydro_parity_check')
     data_assimilation_parameters = compute_parameters.get('data_assimilation_parameters')
-    
+
     # configure python logger
     log_level_set(log_parameters)
 

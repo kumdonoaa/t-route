@@ -5,7 +5,7 @@ from typing import Optional, List, Union
 from typing_extensions import Literal
 
 from .types import FilePath, DirectoryPath
-from ._validators import coerce_datetime, coerce_none_to_default
+from ._validators import coerce_datetime, coerce_none_to_default, validate_simple_scaling_threshold
 
 
 # ---------------------------- Compute Parameters ---------------------------- #
@@ -234,13 +234,24 @@ class QLateralFiles(BaseModel):
 
 class StreamflowDA(BaseModel):
     """
-    Parameters controlling streamflow nudging DA
+    Parameters controlling streamflow DA
     """
     streamflow_nudging: bool = False
+    simple_scaling: bool = False
     """
-    Boolean, determines whether or not streamflow nudging is performed.
+    Boolean, determines whether or not streamflow nudging or streamflow simple scaling is performed.
     NOTE: Mandatory for streamflow DA
     """
+    simple_scaling_dasqkm_threshold: Optional[float] = None
+    """
+    Threshold of drainage area in square kilometers above which streamflow simple scaling is not applied.
+    NOTE: if `simple_scaling` is True, then `simple_scaling_dasqkm_threshold` must be provided.       
+    """
+    streamflow_forecast_lookback_hours: int = 3
+    """
+    Number of hours to look back for streamflow forecast guidance when performing data assimilation.
+    NOTE: Default is 3 hours, but can overide it in config yaml.
+    """   
     gage_segID_crosswalk_file: Optional[FilePath] = None
     """
     File relating stream gage IDs to segment links in the model domain. This is typically the RouteLink file.
@@ -267,6 +278,7 @@ class StreamflowDA(BaseModel):
     If True, enable streamflow data assimilation in diffusive module. 
     NOTE: Not yet implemented, leave as False. (June 25, 2024)
     """
+
 
 
 class ReservoirPersistenceDA(BaseModel):

@@ -39,7 +39,6 @@ class AbstractNetwork(ABC):
 
     
     def __init__(self, from_files=True, value_dict={}):
-
         self._independent_networks = None
         self._reverse_network = None
         self._reaches_by_tw = None
@@ -62,17 +61,18 @@ class AbstractNetwork(ABC):
         streamflow_da = self.data_assimilation_parameters.get('streamflow_da', False)
         break_network_at_gages       = False       
         if streamflow_da:
-            break_network_at_gages   = streamflow_da.get('streamflow_nudging', False)
+            break_network_at_gages   = (streamflow_da.get('streamflow_nudging', False)
+                                        or streamflow_da.get('simple_scaling', False)
+                                        )
         self.break_points            = {"break_network_at_waterbodies": break_network_at_waterbodies,
                                         "break_network_at_gages": break_network_at_gages}
 
         self._break_segments = set()
-
         if self.break_points["break_network_at_waterbodies"]:
             self._break_segments = self._break_segments | set(self.waterbody_connections.values())
         if self.break_points["break_network_at_gages"]:
             self._break_segments = self._break_segments | set(self.gages.get('gages',{}).keys())
-        
+
         self.initialize_routing_scheme()
 
         self.create_independent_networks()

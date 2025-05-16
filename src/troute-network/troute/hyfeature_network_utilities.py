@@ -69,7 +69,9 @@ def build_da_sets(da_params, run_sets, t0):
     nudging = False
     streamflow_da = da_params.get('streamflow_da', False)
     if streamflow_da:
-        nudging = streamflow_da.get('streamflow_nudging', False)
+        nudging = (streamflow_da.get('streamflow_nudging', False) 
+                    or streamflow_da.get('simple_scaling', False)
+                   )
         
     if not usgs_da and not usace_da and not GreatLakes_da and not nudging:
         # if all DA capabilities are OFF, return empty dictionary

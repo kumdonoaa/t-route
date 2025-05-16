@@ -41,3 +41,16 @@ def coerce_datetime(value: Union[str, datetime]) -> datetime:
     raise ValueError(
         f"datetime field must be specified as `datetime.datetime` object or string with format {DATETIME_FORMATS!r}"
     )
+
+def validate_simple_scaling_threshold(values: dict) -> dict:
+    """
+    Ensure that if `simple_scaling` for streamflow DA is True,
+    then `simple_scaling_dasqkm_threshold` must be provided.
+    """
+    scaling = values.get("simple_scaling")
+    threshold = values.get("simple_scaling_dasqkm_threshold")
+    if scaling and threshold is None:
+        raise ValueError(
+            "simple_scaling_dasqkm_threshold must be provided when streamflow data assimilation using simple_scaling is enabled."
+        )
+    return values

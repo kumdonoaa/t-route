@@ -116,8 +116,9 @@ class Config(BaseModel):
             streamflow_DA = da_parameters.streamflow_da
             if streamflow_DA:
                 streamflow_nudging = streamflow_DA.streamflow_nudging
+                streamflow_simple_scaling = streamflow_DA.simple_scaling
                 network_type = values['network_topology_parameters'].supernetwork_parameters.network_type
-                if streamflow_nudging and network_type=='NHDNetwork':
+                if (streamflow_nudging or streamflow_simple_scaling) and network_type=='NHDNetwork':
                     assert streamflow_DA.gage_segID_crosswalk_file, 'Streamflow nudging is enabled on NHDNetwork, but gage_segID_crosswalk_file is missing.'
 
         return values

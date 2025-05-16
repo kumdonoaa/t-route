@@ -1177,7 +1177,7 @@ def get_obs_from_timeslices(
     # concatenate dataframes
     timeslice_obs_df  = pd.concat(timeslice_obs_frames, axis = 1)
     timeslice_qual_df = pd.concat(timeslice_qual_frames, axis = 1)   
-      
+
     # Link <> gage crosswalk data
     df = crosswalk_df.reset_index()
     df[crosswalk_gage_field] = np.asarray(df[crosswalk_gage_field]).astype('<U15')

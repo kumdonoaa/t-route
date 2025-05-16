@@ -551,7 +551,6 @@ def compute_nhd_routing_v02(
     start_time = time.time()
     compute_func = _compute_func_map[compute_func_name]
     if parallel_compute_method == "by-subnetwork-jit-clustered":
-        
         # Create subnetwork objects if they have not already been created
         if not subnetwork_list[0] or not subnetwork_list[1]:
             networks_with_subnetworks_ordered_jit = nhd_network.build_subnetworks(
@@ -571,7 +570,7 @@ def compute_nhd_routing_v02(
                 for subn_tw, subnet in ordered_subn_dict.items():
                     conn_subn = {k: connections[k] for k in subnet if k in connections}
                     rconn_subn = {k: rconn[k] for k in subnet if k in rconn}
-                    
+
                     if not waterbodies_df.empty and not usgs_df.empty:
                         path_func = partial(
                             nhd_network.split_at_gages_waterbodies_and_junctions,
@@ -603,7 +602,6 @@ def compute_nhd_routing_v02(
 
             cluster_threshold = 0.65  # When a job has a total segment count 65% of the target size, compute it
             # Otherwise, keep adding reaches.
-
             reaches_ordered_bysubntw_clustered = defaultdict(dict)
 
             for order in subnetworks_only_ordered_jit:
@@ -682,7 +680,7 @@ def compute_nhd_routing_v02(
                     
                     common_segs = list(param_df.index.intersection(segs))
                     wbodies_segs = set(segs).symmetric_difference(common_segs)
-                    
+
                     #Declare empty dataframe
                     waterbody_types_df_sub = pd.DataFrame()
 
@@ -720,7 +718,7 @@ def compute_nhd_routing_v02(
 
                     param_df_sub = param_df.loc[
                         common_segs,
-                        ["dt", "bw", "tw", "twcc", "dx", "n", "ncc", "cs", "s0", "alt"],
+                        ["dt", "bw", "tw", "twcc", "dx", "n", "ncc", "cs", "s0", "alt",'totaldasqkm'],
                     ].sort_index()
                     
                     param_df_sub_super = param_df_sub.reindex(
@@ -797,7 +795,7 @@ def compute_nhd_routing_v02(
                         from_files,
                         offnetwork_upstreams
                     )
-                    
+
                     # results_subn[order].append(
                     #     compute_func(
                     jobs.append(

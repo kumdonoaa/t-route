@@ -218,7 +218,10 @@ class Columns(BaseModel):
     """
     mainstem ID
     """
-
+    totaldasqkm: str
+    """
+    total drainage area in km^2 for each stream reach
+    """
 
 class WaterbodyParameters(BaseModel):
     """

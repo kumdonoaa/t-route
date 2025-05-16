@@ -55,6 +55,7 @@ def read_geopkg(file_path, compute_parameters, waterbody_parameters, cpu_pool):
     data_assimilation_parameters = compute_parameters.get('data_assimilation_parameters', {})
     if any([
         data_assimilation_parameters.get('streamflow_da', {}).get('streamflow_nudging', False),
+        data_assimilation_parameters.get('streamflow_da', {}).get('simple_scaling', False),
         data_assimilation_parameters.get('reservoir_da', {}).get('reservoir_persistence_usgs', False),
         data_assimilation_parameters.get('reservoir_da', {}).get('reservoir_persistence_usace', False),
         data_assimilation_parameters.get('reservoir_da', {}).get('reservoir_rfc_da', {}).get('reservoir_rfc_forecasts', False)
@@ -327,10 +328,9 @@ class HYFeaturesNetwork(AbstractNetwork):
             print("supernetwork connections set complete")
         if self.showtiming:
             print("... in %s seconds." % (time.time() - start_time))
-            
-
+   
         super().__init__(from_files, value_dict)   
-            
+
         # Create empty dataframe for coastal_boundary_depth_df. This way we can check if
         # it exists, and only read in SCHISM data during 'assemble_forcings' if it doesn't
         self._coastal_boundary_depth_df = pd.DataFrame()
@@ -368,7 +368,7 @@ class HYFeaturesNetwork(AbstractNetwork):
     
     def preprocess_network(self, flowpaths, nexus):
         self._dataframe = flowpaths
-        
+
         cols = self.supernetwork_parameters.get('columns', None)
         if cols:
             col_idx = list(set(cols.values()).intersection(set(self.dataframe.columns)))
@@ -604,6 +604,7 @@ class HYFeaturesNetwork(AbstractNetwork):
         self._dataframe = self.dataframe.drop('waterbody', axis=1).drop_duplicates()
 
     def preprocess_data_assimilation(self, network):
+
         if not network.empty:
             gages_df = network[['id','hl_uri','hydroseq']].drop_duplicates()
             # clear out missing values
@@ -631,11 +632,12 @@ class HYFeaturesNetwork(AbstractNetwork):
                 idx_id = 'index'
             self._gages = (
                 gages_df.loc[usgs_ind].reset_index()
-                .sort_values('hydroseq').drop_duplicates(['value'],keep='last')
+                #.sort_values('hydroseq').drop_duplicates(['value'],keep='last')
+                .sort_values('hydroseq').drop_duplicates(['value'],keep='first') #Temporary solution to correctly match stream seg with gauge
                 .set_index(idx_id)[['value']].rename(columns={'value': 'gages'})
                 .rename_axis(None, axis=0).to_dict()
             )
-            
+
             #FIXME: temporary solution, add canadian gage crosswalk dataframe. This should come from
             # the hydrofabric.
             self._canadian_gage_link_df = pd.DataFrame(columns=['gages','link']).set_index('link')

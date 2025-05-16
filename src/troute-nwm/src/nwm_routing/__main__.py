@@ -77,7 +77,7 @@ def main_v04(argv):
     # perform initial warmstate preprocess.
     
     network_start_time = time.time()
-    
+
     #if "ngen_nexus_file" in supernetwork_parameters:
     if supernetwork_parameters["network_type"] == 'HYFeaturesNetwork':
         network = HYFeaturesNetwork(supernetwork_parameters,
