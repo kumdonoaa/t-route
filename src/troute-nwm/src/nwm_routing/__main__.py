@@ -36,10 +36,9 @@ LOG = logging.getLogger('')
 '''
 High level orchestration of ngen t-route simulations for NWM application
 '''
-def main_v04(argv):
-
-    args = _handle_args_v03(argv)
+def main_v04(argv):    
     
+    args = _handle_args_v03(argv)
     # unpack user inputs
     (
         log_parameters,
@@ -259,6 +258,7 @@ def main_v04(argv):
         subnetwork_list = run_results[1]
         run_results = run_results[0]
 
+        
         
         route_end_time = time.time()
         task_times['route_time'] += route_end_time - route_start_time
@@ -1843,7 +1843,7 @@ def main_v03(argv):
     if showtiming:
         task_times['total_time'] = time.time() - main_start_time
 
-    LOG.debug("process complete in %s seconds." % (time.time() - main_start_time))
+    LOG.debug("process complete in %s seconds." % (time.time() - main_start_time))    
     
     if showtiming:
         print('************ TIMING SUMMARY ************')

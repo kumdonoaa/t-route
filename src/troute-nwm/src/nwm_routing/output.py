@@ -190,6 +190,13 @@ def nwm_output_generator(
     wbdyo = output_parameters.get("lakeout_output", None)
     stream_output = output_parameters.get("stream_output", None)
     lastobso = output_parameters.get("lastobs_output", None)
+    
+    #delete unused results columns
+    for i in range(len(results)):
+        results[i] = list(results[i])
+        results[i][4] = None
+        results[i][5] = None
+        results[i][6] = None
 
     if csv_output:
         csv_output_folder = output_parameters["csv_output"].get(
@@ -214,6 +221,8 @@ def nwm_output_generator(
             [pd.DataFrame(r[1], index=r[0], columns=qvd_columns) for r in results],
             copy=False,
         )
+        for i in range(len(results)):
+            results[i][1] = None
 
         if wbdyo and not waterbodies_df.empty:
             
@@ -289,6 +298,7 @@ def nwm_output_generator(
         
         nudge = np.concatenate([r[8] for r in results])
         usgs_positions_id = np.concatenate([r[3][0] for r in results])
+
         nhd_io.write_flowveldepth(
             Path(stream_output_directory),
             stream_output_mask, 
@@ -304,6 +314,12 @@ def nwm_output_generator(
             poi_crosswalk = poi_crosswalk,
             nexus_dict= nexus_dict,
             )
+            
+        # if parity_set is undefined results won't be used again after this point
+        try:
+            parity_set
+        except NameError:
+            del results
 
         if (not logFileName == 'NONE'):
             with open(logFileName, 'a') as preRunLog:
