@@ -46,9 +46,9 @@ def read_geopkg(file_path, compute_parameters, waterbody_parameters, cpu_pool):
     # Match available layers to the patterns
     matched_layers = {key: find_layer_name(available_layers, pattern) 
                       for key, pattern in layer_patterns.items()}
-    
+
     layers_to_read = ['flowpaths', 'flowpath_attributes']
-    
+
     if waterbody_parameters.get('break_network_at_waterbodies', False):
         layers_to_read.extend(['lakes', 'nexus'])
 
@@ -114,6 +114,174 @@ def read_geopkg(file_path, compute_parameters, waterbody_parameters, cpu_pool):
     nexus = table_dict.get('nexus', pd.DataFrame())
 
     return flowpaths, lakes, network, nexus
+
+def read_geopkg_dev(file_path, compute_parameters, waterbody_parameters, cpu_pool):
+    # 1) Discover layers in the GeoPackage
+    #available_layers = list(fiona.listlayers(file_path))
+    available_layers = list(gpd.list_layers(file_path)["name"])
+
+    # 2) Patterns for both v2.2 and v3.0
+    layer_patterns = {
+        # v2.2 pair
+        'flowpaths': r'flow[-_]?paths?$',
+        'flowpath_attributes': r'flow[-_]?path[-_]?attributes?$',
+        # v3.0 pair
+        'flowlines': r'flow[-_]?lines?$',
+        'flowline_attributes': r'flow[-_]?line[-_]?attributes?$',
+        # common optionals
+        'lakes': r'lakes?$',
+        'nexus': r'nexus?$',
+        'network': r'network$',
+    }
+
+    matched_layers = {k: find_layer_name(available_layers, p)
+                      for k, p in layer_patterns.items()}
+
+    # 3) Decide version by which pair is present (prefer v3.0 if both appear)
+    have_v30 = ('flowlines' in available_layers) and (('flowline-attributes' in available_layers) or ('flowline_attributes' in available_layers))
+    have_v22 = not have_v30
+
+    if have_v30:
+        version_tag = 'v30'
+        geom_key = 'flowlines'
+        attr_key = 'flowline_attributes'
+    elif have_v22:
+        version_tag = 'v22'
+        geom_key = 'flowpaths'
+        attr_key = 'flowpath_attributes'
+    else:
+        raise RuntimeError(
+            "Could not detect HydroFabric version. Need either "
+            "(flowlines & flowline-attributes) or (flowpaths & flowpath-attributes). "
+            f"Found layers: {available_layers}"
+        )
+
+    # 4) Build the read list (geometry+attributes at minimum)
+    layers_to_read = [geom_key, attr_key]
+
+    if waterbody_parameters.get('break_network_at_waterbodies', False):
+        layers_to_read.extend([ln for ln in ('lakes', 'nexus') if matched_layers.get(ln)])
+
+    da = compute_parameters.get('data_assimilation_parameters', {})
+    if any([
+        da.get('streamflow_da', {}).get('streamflow_nudging', False),
+        da.get('reservoir_da', {}).get('reservoir_persistence_usgs', False),
+        da.get('reservoir_da', {}).get('reservoir_persistence_usace', False),
+        da.get('reservoir_da', {}).get('reservoir_rfc_da', {}).get('reservoir_rfc_forecasts', False),
+    ]):
+        if matched_layers.get('network'):
+            layers_to_read.append('network')
+
+    hybrid = compute_parameters.get('hybrid_parameters', {})
+    if hybrid.get('run_hybrid_routing', False) and 'nexus' not in layers_to_read:
+        if matched_layers.get('nexus'):
+            layers_to_read.append('nexus')
+
+    # 5) Reader
+    def read_layer(layer_key):
+        name = matched_layers.get(layer_key)
+        if not name:
+            return pd.DataFrame()
+        try:
+            return gpd.read_file(file_path, layer=name)
+        except Exception as e:
+            print(f"Error reading {name}: {e}")
+            return pd.DataFrame()
+
+    # 6) Read (parallel if requested)
+    if cpu_pool and cpu_pool > 1:
+        with Parallel(n_jobs=min(cpu_pool, len(layers_to_read))) as parallel:
+            gpkg_list = parallel(delayed(read_layer)(layer) for layer in layers_to_read)
+        table_dict = {layers_to_read[i]: gpkg_list[i] for i in range(len(layers_to_read))}
+    else:
+        table_dict = {lk: read_layer(layer) for layer in layers_to_read}
+
+    # 7) Extract the two core tables
+    geom_df = table_dict.get(geom_key, pd.DataFrame())
+    attr_df = table_dict.get(attr_key, pd.DataFrame())
+
+    # 8) Normalize/prepare columns for join per version
+    #    Choose the correct join key names on each side.
+    if version_tag == 'v30':
+        # v3.0: flowlines/flowline-attributes keyed by flowline_id
+        left_key = 'flowline_id'
+        right_key = 'flowline_id'
+        # Some exports also include a bare 'id'; we prefer the explicit flowline_id
+        if left_key not in geom_df.columns and 'id' in geom_df.columns:
+            geom_df = geom_df.rename(columns={'id': left_key})
+        if right_key not in attr_df.columns and 'id' in attr_df.columns:
+            attr_df = attr_df.rename(columns={'id': right_key})
+    else:
+        # v2.2: flowpaths/flowpath-attributes keyed by id (attributes may use 'link')
+        left_key = 'id'
+        right_key = 'id'
+        if left_key not in geom_df.columns and 'link' in geom_df.columns:
+            geom_df = geom_df.rename(columns={'link': left_key})
+        if right_key not in attr_df.columns and 'link' in attr_df.columns:
+            attr_df = attr_df.rename(columns={'link': right_key})
+
+    # 9) Drop duplicate columns prior to merge
+    if not attr_df.empty and not geom_df.empty:
+        unique_cols = list(set(attr_df.columns) - set(geom_df.columns))
+        if right_key not in unique_cols:
+            unique_cols.append(right_key)
+        attr_df = attr_df[unique_cols]
+
+    # 10) Merge geometry + attributes
+    flow = pd.merge(geom_df, attr_df, left_on=left_key, right_on=right_key, how='inner')
+    if left_key != right_key and right_key in flow.columns:
+        flow = flow.drop(columns=[right_key])
+
+    # 11) Normalize to a common internal schema (id, toid, length_m, So, gages, …)
+    def _normalize_flow_table(df, version_tag):
+        ren = {}
+        if version_tag == 'v30':
+            # Connectivity in v3.0 is flowline_id -> flowline_toid
+            if 'flowline_id' in df.columns:
+                ren['flowline_id'] = 'id'
+            if 'flowline_toid' in df.columns:
+                ren['flowline_toid'] = 'toid'
+        else:
+            # v2.2: ensure 'id' and 'toid' exist (some exports use 'to')
+            if 'id' not in df.columns and 'link' in df.columns:
+                ren['link'] = 'id'
+            if 'toid' not in df.columns and 'to' in df.columns:
+                ren['to'] = 'toid'
+
+        # length & slope harmonization
+        #if 'length_m' not in df.columns and 'Length_m' in df.columns:
+        #    ren['Length_m'] = 'length_m'
+        if 'lengthm' in df.columns and 'Length_m' not in df.columns:
+            ren['lengthm'] = 'Length_m'
+        #if 'So' not in df.columns and 'ChSlp' in df.columns:
+        #    ren['ChSlp'] = 'So'
+
+        df = df.rename(columns=ren)
+
+        # Dtypes (avoid accidental object/int mismatches)
+        #if 'id' in df.columns:
+        #    df['id'] = pd.to_numeric(df['id'], errors='ignore')
+        #if 'toid' in df.columns:
+        #    df['toid'] = pd.to_numeric(df['toid'], errors='ignore')
+
+        # gages: v3.0 often uses hl_reference; v2.2 may use gage/gages
+        if 'gage' not in df.columns:
+            if 'gages' in df.columns:
+                df = df.rename(columns={'gages': 'gage'})
+            elif 'hl_reference' in df.columns:
+                s = df['hl_reference'].fillna('').str.extract(r'(?:^|,)\s*nwis-(\d{8})', expand=True)[0]
+                df['gage'] = s
+
+        return df
+
+    flow = _normalize_flow_table(flow, version_tag)
+
+    # 12) Optionals
+    lakes   = table_dict.get('lakes',   pd.DataFrame())
+    network = table_dict.get('network', pd.DataFrame())
+    nexus   = table_dict.get('nexus',   pd.DataFrame())
+
+    return flow, lakes, network, nexus
 
 def read_json(file_path, edge_list):
     dfs = []
@@ -205,7 +373,7 @@ def read_geo_file(supernetwork_parameters, waterbody_parameters, compute_paramet
     
     file_type = Path(geo_file_path).suffix
     if(file_type=='.gpkg'):        
-        flowpaths, lakes, network, nexus = read_geopkg(geo_file_path,
+        flowpaths, lakes, network, nexus = read_geopkg_dev(geo_file_path,
                                                        compute_parameters,
                                                        waterbody_parameters,
                                                        cpu_pool)
