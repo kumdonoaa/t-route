@@ -116,6 +116,7 @@ def read_geopkg(file_path, compute_parameters, waterbody_parameters, cpu_pool):
     return flowpaths, lakes, network, nexus
 
 def read_geopkg_dev(file_path, compute_parameters, waterbody_parameters, cpu_pool):
+    global use_flowline, use_flowpath
     # 1) Discover layers in the GeoPackage
     #available_layers = list(fiona.listlayers(file_path))
     available_layers = list(gpd.list_layers(file_path)["name"])
@@ -128,6 +129,7 @@ def read_geopkg_dev(file_path, compute_parameters, waterbody_parameters, cpu_poo
         # v3.0 pair
         'flowlines': r'flow[-_]?lines?$',
         'flowline_attributes': r'flow[-_]?line[-_]?attributes?$',
+        'network_mod': r'network[-_]?mod?',
         # common optionals
         'lakes': r'lakes?$',
         'nexus': r'nexus?$',
@@ -136,19 +138,21 @@ def read_geopkg_dev(file_path, compute_parameters, waterbody_parameters, cpu_poo
 
     matched_layers = {k: find_layer_name(available_layers, p)
                       for k, p in layer_patterns.items()}
-
+    
     # 3) Decide version by which pair is present (prefer v3.0 if both appear)
-    have_v30 = ('flowlines' in available_layers) and (('flowline-attributes' in available_layers) or ('flowline_attributes' in available_layers))
-    have_v22 = not have_v30
+    use_flowline = ('flowlines' in available_layers) and (('flowline-attributes' in available_layers) or ('flowline_attributes' in available_layers))
+    use_flowpath = not use_flowline
 
-    if have_v30:
+    if use_flowline:
         version_tag = 'v30'
         geom_key = 'flowlines'
-        attr_key = 'flowline_attributes'
-    elif have_v22:
+        attr_key = 'flowline_attributes' 
+        nexus_flowline_key = 'network_mod'
+    elif use_flowpath:
         version_tag = 'v22'
         geom_key = 'flowpaths'
         attr_key = 'flowpath_attributes'
+        nexus_flowline_key = ''
     else:
         raise RuntimeError(
             "Could not detect HydroFabric version. Need either "
@@ -157,7 +161,7 @@ def read_geopkg_dev(file_path, compute_parameters, waterbody_parameters, cpu_poo
         )
 
     # 4) Build the read list (geometry+attributes at minimum)
-    layers_to_read = [geom_key, attr_key]
+    layers_to_read = [geom_key, attr_key, nexus_flowline_key]
 
     if waterbody_parameters.get('break_network_at_waterbodies', False):
         layers_to_read.extend([ln for ln in ('lakes', 'nexus') if matched_layers.get(ln)])
@@ -232,7 +236,7 @@ def read_geopkg_dev(file_path, compute_parameters, waterbody_parameters, cpu_poo
     if left_key != right_key and right_key in flow.columns:
         flow = flow.drop(columns=[right_key])
 
-    # 11) Normalize to a common internal schema (id, toid, length_m, So, gages, …)
+    # 11) Normalize to a common internal schema (id, toid, length_m, gages, …)
     def _normalize_flow_table(df, version_tag):
         ren = {}
         if version_tag == 'v30':
@@ -249,20 +253,10 @@ def read_geopkg_dev(file_path, compute_parameters, waterbody_parameters, cpu_poo
                 ren['to'] = 'toid'
 
         # length & slope harmonization
-        #if 'length_m' not in df.columns and 'Length_m' in df.columns:
-        #    ren['Length_m'] = 'length_m'
         if 'lengthm' in df.columns and 'Length_m' not in df.columns:
             ren['lengthm'] = 'Length_m'
-        #if 'So' not in df.columns and 'ChSlp' in df.columns:
-        #    ren['ChSlp'] = 'So'
 
         df = df.rename(columns=ren)
-
-        # Dtypes (avoid accidental object/int mismatches)
-        #if 'id' in df.columns:
-        #    df['id'] = pd.to_numeric(df['id'], errors='ignore')
-        #if 'toid' in df.columns:
-        #    df['toid'] = pd.to_numeric(df['toid'], errors='ignore')
 
         # gages: v3.0 often uses hl_reference; v2.2 may use gage/gages
         if 'gage' not in df.columns:
@@ -271,6 +265,10 @@ def read_geopkg_dev(file_path, compute_parameters, waterbody_parameters, cpu_poo
             elif 'hl_reference' in df.columns:
                 s = df['hl_reference'].fillna('').str.extract(r'(?:^|,)\s*nwis-(\d{8})', expand=True)[0]
                 df['gage'] = s
+        
+        # Ensure WaterbodyID column exists (fill with NA if missing)
+        if 'WaterbodyID' not in df.columns:
+            df['WaterbodyID'] = pd.NA
 
         return df
 
@@ -280,8 +278,9 @@ def read_geopkg_dev(file_path, compute_parameters, waterbody_parameters, cpu_poo
     lakes   = table_dict.get('lakes',   pd.DataFrame())
     network = table_dict.get('network', pd.DataFrame())
     nexus   = table_dict.get('nexus',   pd.DataFrame())
+    network_mod = table_dict.get('network_mod',   pd.DataFrame())
 
-    return flow, lakes, network, nexus
+    return flow, lakes, network, nexus, network_mod
 
 def read_json(file_path, edge_list):
     dfs = []
@@ -306,12 +305,15 @@ def read_geojson(file_path):
     flowpaths = gpd.read_file(file_path)
     return flowpaths
 
-def numeric_id(flowpath):
-    id = flowpath['key'].split('-')[-1]
-    toid = flowpath['downstream'].split('-')[-1]
-    flowpath['key'] = int(float(id))
-    flowpath['downstream'] = int(float(toid))
+def numeric_id(flowpath, id_col='key', toid_col='downstream'):
+    id = flowpath[id_col].split('-')[-1]
+    toid = flowpath[toid_col].split('-')[-1]
+    flowpath[id_col] = int(float(id))
+    flowpath[toid_col] = int(float(toid))
     return flowpath
+
+
+
 
 def read_ngen_waterbody_df(parm_file, lake_index_field="wb-id", lake_id_mask=None):
     """
@@ -373,7 +375,7 @@ def read_geo_file(supernetwork_parameters, waterbody_parameters, compute_paramet
     
     file_type = Path(geo_file_path).suffix
     if(file_type=='.gpkg'):        
-        flowpaths, lakes, network, nexus = read_geopkg_dev(geo_file_path,
+        flowpaths, lakes, network, nexus, network_mod = read_geopkg_dev(geo_file_path,
                                                        compute_parameters,
                                                        waterbody_parameters,
                                                        cpu_pool)
@@ -385,7 +387,7 @@ def read_geo_file(supernetwork_parameters, waterbody_parameters, compute_paramet
     else:
         raise RuntimeError("Unsupported file type: {}".format(file_type))
     
-    return flowpaths, lakes, network, nexus
+    return flowpaths, lakes, network, nexus, network_mod
 
 def load_bmi_data(value_dict, bmi_parameters,): 
     # Get the column names that we need from each table of the geopackage
@@ -472,7 +474,7 @@ class HYFeaturesNetwork(AbstractNetwork):
             if not from_files_copy:
                 from_files=True
             if from_files:
-                flowpaths, lakes, network, nexus = read_geo_file(
+                flowpaths, lakes, network, nexus, network_mod = read_geo_file(
                     self.supernetwork_parameters,
                     self.waterbody_parameters,
                     self.compute_parameters,
@@ -488,7 +490,7 @@ class HYFeaturesNetwork(AbstractNetwork):
                 from_files=False
 
             # Preprocess network objects
-            self.preprocess_network(flowpaths, nexus)
+            self.preprocess_network(flowpaths, nexus, network_mod)
             
             self.crosswalk_nex_flowpath_poi(flowpaths, nexus)
 
@@ -548,9 +550,8 @@ class HYFeaturesNetwork(AbstractNetwork):
         return np.nan #pd.NA
     
     
-    def preprocess_network(self, flowpaths, nexus):
+    def preprocess_network(self, flowpaths, nexus, network_mod):
         self._dataframe = flowpaths
-        
         cols = self.supernetwork_parameters.get('columns', None)
         if cols:
             col_idx = list(set(cols.values()).intersection(set(self.dataframe.columns)))
@@ -572,17 +573,53 @@ class HYFeaturesNetwork(AbstractNetwork):
             #        musx: "MusX"
             #        cs: "ChSlp"  # TODO: rename to `sideslope`
             self._dataframe = self.dataframe.rename(columns=reverse_dict(cols))
-        
-        # Don't need the string prefix anymore, drop it
-        mask = ~ self.dataframe['downstream'].str.startswith("tnx") 
-        self._dataframe = self.dataframe.apply(numeric_id, axis=1)
-        
-        # make the flowpath linkage, ignore the terminal nexus
-        self._flowpath_dict = dict(zip(self.dataframe.loc[mask].downstream, self.dataframe.loc[mask].key))
+
+        if use_flowpath:
+            # Don't need the string prefix anymore, drop it
+            self._dataframe = self.dataframe.apply(numeric_id, axis=1, args=('key', 'downstream'))
+            # Boolean mask True to a row when 'downstream' nexus has an outgoing edge (non-terminal) and
+            # False when 'downstream' nexus is terminal. 
+            # Use this approach for masking, as some nexus points are not properly prefixed with "tnx-" 
+            # despite being terminal nodes.
+            # mask = ~ self.dataframe['downstream'].str.startswith("tnx")   
+            key_nums = self._dataframe.key
+            down_nums = self._dataframe.downstream
+            mask = down_nums.isin(set(key_nums.dropna().tolist()))
+            terminal_nexus = set(down_nums[~mask].dropna().astype(int))
+            
+            # self._flowpath_dict or self.downstream_flowpath_dict was previously used to assign 
+            # lateral flow from a nexus node to one of its upstream flowpaths. 
+            # This approach is now deprecated, as explained in build_qlateral_array(). 
+            # Instead, self._nexus_to_reach is used to correctly link the lateral flow at a nexus node 
+            # to its downstream reach.            
+            # make the flowpath linkage, ignore the terminal nexus
+            #self._flowpath_dict = dict(zip(self.dataframe.loc[mask].downstream, self.dataframe.loc[mask].key))
+            self._flowpath_dict = {}
+        elif use_flowline:           
+            self._dataframe = self.dataframe.apply(numeric_id, axis=1, args=('flowpath_id', 'flowpath_toid'))
+            key_nums = self._dataframe.flowpath_id
+            down_nums = self._dataframe.flowpath_toid
+            mask = down_nums.isin(set(key_nums.dropna().tolist()))
+            terminal_nexus = set(down_nums[~mask].dropna().astype(int))            
+            self._flowpath_dict = {}
         
         self._dataframe.set_index("key", inplace=True)
         self._dataframe = self.dataframe.sort_index()
-        
+ 
+        # Build nexus to its immediately downstream flowapth/flowline lookup dictionary except terminal nexus.
+        if use_flowpath: 
+            id_num   = pd.to_numeric(nexus["id"].astype(str).str.extract(r"(\d+)", expand=False), errors="coerce")
+            toid_num = pd.to_numeric(nexus["toid"].astype(str).str.extract(r"(\d+)", expand=False), errors="coerce")
+            keep = (~id_num.isna()) & (~toid_num.isna()) & (~id_num.isin(terminal_nexus))
+            self._nexus_to_reach = dict(zip(id_num[keep].astype(int), toid_num[keep].astype(int)))
+        elif use_flowline:    
+            id_num   = pd.to_numeric(network_mod["nexus_id"].astype(str).str.extract(r"(\d+)", expand=False), errors="coerce")
+            toid_num = pd.to_numeric(network_mod["ds_flowline"].astype(str).str.extract(r"(\d+)", expand=False), errors="coerce")
+            keep = (~id_num.isna()) & (~toid_num.isna()) & (~id_num.isin(terminal_nexus))
+            self._nexus_to_reach = dict(zip(id_num[keep].astype(int), toid_num[keep].astype(int)))
+
+        import pdb; pdb.set_trace()
+
         # **********  need to be included in flowpath_attributes  *************
         if 'alt' not in self.dataframe.columns:
             self._dataframe['alt'] = 1.0 #FIXME get the right value for this... 
@@ -618,7 +655,7 @@ class HYFeaturesNetwork(AbstractNetwork):
         self._connections = extract_connections(
             self.dataframe, "downstream", terminal_codes=self.terminal_codes
         )
-        
+
         # Store a dataframe containing info about nexus points. This will be reprojected to lat/lon
         # and filtered for only diffusive domain tailwaters in AbstractNetwork.py.
         # Location information will be used to advertise tailwater locations of diffusive domains 
@@ -626,7 +663,6 @@ class HYFeaturesNetwork(AbstractNetwork):
         self._nexus_latlon = nexus
 
     def crosswalk_nex_flowpath_poi(self, flowpaths, nexus):
-        
         mask_flowpaths = flowpaths['toid'].str.startswith(('nex-', 'tnex-'))
         filtered_flowpaths = flowpaths[mask_flowpaths]
         self._nexus_dict = filtered_flowpaths.groupby('toid')['id'].apply(list).to_dict()  ##{id: toid}
@@ -673,7 +709,7 @@ class HYFeaturesNetwork(AbstractNetwork):
                 'synthetic_ids': [int(id + 9.99e11) for id in duplicate_ids]
             })
             update_dict = dict(self._duplicate_ids_df[['lake_id','synthetic_ids']].values)
-            
+  
             tmp_wbody_conn = self.dataframe[['waterbody']].dropna()
             tmp_wbody_conn = (
                 tmp_wbody_conn['waterbody']
@@ -799,9 +835,8 @@ class HYFeaturesNetwork(AbstractNetwork):
             self._link_lake_crosswalk = None
             self._duplicate_ids_df = pd.DataFrame()
             self._gl_climatology_df = pd.DataFrame()
-
         self._dataframe = self.dataframe.drop('waterbody', axis=1).drop_duplicates()
-
+       
     def preprocess_data_assimilation(self, network):
         if not network.empty:
             gages_df = network[['id','hl_uri','hydroseq']].drop_duplicates()
@@ -900,7 +935,7 @@ class HYFeaturesNetwork(AbstractNetwork):
             self._usace_lake_gage_crosswalk = pd.DataFrame()
             self._rfc_lake_gage_crosswalk = pd.DataFrame()
     
-    def build_qlateral_array(self, run,):
+    def build_qlateral_array_josh(self, run,):
         
         # TODO: set default/optional arguments
         qts_subdivisions = run.get("qts_subdivisions", 1)
@@ -987,13 +1022,11 @@ class HYFeaturesNetwork(AbstractNetwork):
             #find the terminal nodes
             for tnx, test_up in self._upstream_terminal.items():
                 #first need to ensure there is an upstream location to dump to
-                pdb.set_trace()
                 for nex in test_up:
                     try:
                         #FIXME if multiple upstreams exist in this case then a choice is to be made as to which it goes into
                         #some cases the choice is easy cause the upstream doesn't exist, but in others, it may not be so simple
                         #in such cases where multiple valid upstream nexuses exist, perhaps the mainstem should be used?
-                        pdb.set_trace()
                         qlats_df.loc[up] += nexuses_lateralflows_df.loc[tnx]
                         break #flow added, don't add it again!
                     except KeyError:
@@ -1036,6 +1069,129 @@ class HYFeaturesNetwork(AbstractNetwork):
             qlats_df = qlats_df[qlats_df.index.isin(self.segment_index)]
 
         self._qlateral = qlats_df
+
+    def build_qlateral_array(self, run,):
+        # TODO: set default/optional arguments
+        qts_subdivisions = run.get("qts_subdivisions", 1)
+        nts = run.get("nts", 1)
+        qlat_input_folder = run.get("qlat_input_folder", None)
+        qlat_input_file = run.get("qlat_input_file", None)
+
+        if qlat_input_folder:
+            qlat_input_folder = Path(qlat_input_folder)
+            if "qlat_files" in run:
+                qlat_files = run.get("qlat_files")
+                qlat_files = [qlat_input_folder.joinpath(f) for f in qlat_files]
+            elif "qlat_file_pattern_filter" in run:
+                qlat_file_pattern_filter = run.get(
+                    "qlat_file_pattern_filter", "*CHRT_OUT*"
+                )
+                qlat_files = sorted(qlat_input_folder.glob(qlat_file_pattern_filter))
+            
+            dfs=[]
+            
+            #FIXME Temporary solution to allow t-route to use ngen nex-* output files as forcing files
+            # This capability should be here, but we need to think through how to handle all of this 
+            # data in memory for large domains and many timesteps... - shorvath, Feb 28, 2024            
+            qlat_file_pattern_filter = self.forcing_parameters.get("qlat_file_pattern_filter", None)
+            if qlat_file_pattern_filter=="nex-*":
+                for f in qlat_files:
+                    # 'qlat' from nex-* files is the sum of the total runoff accumulated from each catchment (
+                    # (direct runoff + subsurface runoff + groundwater) that drains into the corresponding nexus. [m3/sec]  
+                    df = pd.read_csv(f, names=['timestamp', 'qlat'], index_col=[0])
+                    df['timestamp'] = pd.to_datetime(df['timestamp']).dt.strftime('%Y%m%d%H%M')
+                    df = df.set_index('timestamp')
+                    df = df.T
+                    df.index = [int(os.path.basename(f).split('-')[1].split('_')[0])]
+                    df = df.rename_axis(None, axis=1)
+                    df.index.name = 'feature_id'
+                    dfs.append(df)
+                # lateral flows [m^3/s] are stored at NEXUS points with NEXUS ids
+                nexuses_lateralflows_df = pd.concat(dfs, axis=0) 
+            else:
+                for f in qlat_files:
+                    df = read_file(f)
+                    df['feature_id'] = df['feature_id'].map(lambda x: int(str(x).removeprefix('nex-')) if str(x).startswith('nex') else int(x))
+                    assert df[
+                        "feature_id"
+                    ].is_unique, f"'feature_id's must be unique. '{f!s}' contains duplicate 'feature_id's: {pformat(df.loc[df['feature_id'].duplicated(), 'feature_id'].to_list())}"
+                    df = df.set_index('feature_id')
+                    dfs.append(df)
+
+                # lateral flows [m^3/s] are stored at NEXUS points with NEXUS ids
+                nexuses_lateralflows_df = pd.concat(dfs, axis=1) 
+            # Take flowpath ids entering NEXUS and replace NEXUS ids by the upstream flowpath ids
+            #qlats_df = nexuses_lateralflows_df.rename(index=self.downstream_flowpath_dict)            
+            
+            # In rainfall-runoff model of ngen framework, the total runoff accumulated from each catchment that 
+            # drains into the corresponding nexus. Based on Fred’s recommendation, rather than treating lateral inflow as 
+            # a distributed side influx (m²/s) along the reach, we will inject it as a lumped discharge (m³/s) into 
+            # the flowline that lies immediately downstream of and is connected to the nexus.
+            qlats_df = nexuses_lateralflows_df.rename(index=self._nexus_to_reach)
+            qlats_df = qlats_df[qlats_df.index.isin(self.segment_index)]
+
+            '''
+            #For a terminal nexus, we want to include the lateral flow from the catchment contributing to that nexus
+            #one way to do that is to cheat and put that lateral flow at the upstream...this is probably the simplest way
+            #right now.  The other is to create a virtual channel segment downstream to "route" i.e accumulate into
+            #but it isn't clear right now how to do that with flow/velocity/depth requirements
+            #find the terminal nodes
+            for tnx, test_up in self._upstream_terminal.items():
+                #first need to ensure there is an upstream location to dump to
+                for nex in test_up:
+                    try:
+                        #FIXME if multiple upstreams exist in this case then a choice is to be made as to which it goes into
+                        #some cases the choice is easy cause the upstream doesn't exist, but in others, it may not be so simple
+                        #in such cases where multiple valid upstream nexuses exist, perhaps the mainstem should be used?
+                        qlats_df.loc[up] += nexuses_lateralflows_df.loc[tnx]
+                        break #flow added, don't add it again!
+                    except KeyError:
+                        #this upstream doesn't actually exist on the network (maybe it is a headwater?)
+                        #or perhaps the output file doesnt exist?  If this is the case, this isn't a good trap
+                        #but for now, add the flow to a known good nexus upstream of the terminal
+                        continue
+                    #TODO what happens if can't put the qlat anywhere?  Right now this silently ignores the issue...
+                qlats_df.drop(tnx, inplace=True)
+            '''
+
+            # The segment_index has the full network set of segments/flowpaths. 
+            # Whereas the set of flowpaths that are downstream of nexuses is a 
+            # subset of the segment_index. Therefore, all of the segments/flowpaths
+            # that are not accounted for in the set of flowpaths downstream of
+            # nexuses need to be added to the qlateral dataframe and padded with
+            # zeros.
+            all_df = pd.DataFrame( np.zeros( (len(self.segment_index), len(qlats_df.columns)) ), index=self.segment_index,
+                columns=qlats_df.columns )
+            all_df.loc[ qlats_df.index ] = qlats_df
+            qlats_df = all_df.sort_index()
+
+        elif qlat_input_file:
+            qlats_df = nhd_io.get_ql_from_csv(qlat_input_file)
+        else:
+            qlat_const = run.get("qlat_const", 0)
+            qlats_df = pd.DataFrame(
+                qlat_const,
+                index=self.segment_index,
+                columns=range(nts // qts_subdivisions),
+                dtype="float32",
+            )
+
+        # TODO: Make a more sophisticated date-based filter
+        max_col = 1 + nts // qts_subdivisions
+        col_t0 =self.t0.strftime('%Y%m%d%H%M') 
+        col_t0_idx = qlats_df.columns.get_loc(col_t0)
+        if len(qlats_df.columns) > max_col:
+            #qlats_df.drop(qlats_df.columns[max_col:], axis=1, inplace=True)
+            # When the start datetime of the nex-* files differs from the simulation start time (self.t0), 
+            # the existing routine cannot properly subset qlats_df.
+            stop = col_t0_idx + max_col - 1
+            qlats_df = qlats_df.iloc[:, col_t0_idx:stop]
+
+        if not self.segment_index.empty:
+            qlats_df = qlats_df[qlats_df.index.isin(self.segment_index)]
+
+        self._qlateral = qlats_df
+
 
     ######################################################################
     #FIXME Temporary solution to hydrofabric issues.
