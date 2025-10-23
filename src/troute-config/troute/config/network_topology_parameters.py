@@ -220,6 +220,14 @@ class Columns(BaseModel):
     """
     mainstem ID
     """
+    flowpath_id: Optional[str]
+    """
+    flowpath id
+    """
+    flowpath_toid: Optional[str]
+    """
+    flowpathto id
+    """
 
 
 class WaterbodyParameters(BaseModel):
@@ -256,4 +264,3 @@ PreprocessingParameters.update_forward_refs()
 SupernetworkParameters.update_forward_refs()
 WaterbodyParameters.update_forward_refs()
 LevelPool.update_forward_refs()
-
