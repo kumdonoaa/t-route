@@ -505,22 +505,6 @@ def compute_log_diff(
         preRunLog.write("\n")  
 
 
-def interpolation_shared(pseudo_key, pseudo_val, shm_name, keys, shape, dtype):
-
-    # Attach to shared memory block
-    shm = shared_memory.SharedMemory(name=shm_name)
-    shared_arr = np.ndarray(shape, dtype=dtype, buffer=shm.buf)
-
-    # Perform computation
-    index = np.where(keys == pseudo_key)[0][0]
-    index_target = np.where(keys == pseudo_val['target_flowline'][0])[0][0]
-
-    shared_arr[index] = shared_arr[index_target] * (
-        (pseudo_val["contributing_area"] / pseudo_val["target_flowline"][1]) ** 0.7
-    )
-    shm.close()
-
-
 def compute_nhd_routing_v02(
     connections,
     rconn,
@@ -559,13 +543,9 @@ def compute_nhd_routing_v02(
     subnetwork_list,
     flowveldepth_interorder = {},
     from_files = True,
-    pseudo_headwater_dict = {},
-    giuh_node = False,
 ):
     da_decay_coefficient = da_parameter_dict.get("da_decay_coefficient", 0)
     param_df["dt"] = dt
-    if 'reference_id' in param_df.columns:
-        param_df = param_df.drop('reference_id', axis=1).drop_duplicates()
     param_df = param_df.astype("float32")
     
     start_time = time.time()
@@ -894,8 +874,7 @@ def compute_nhd_routing_v02(
                             },
                             assume_short_ts,
                             return_courant,
-                            from_files = from_files,
-                            giuh_node=giuh_node
+                            from_files = from_files
                         )
                     )
                 results_subn[order] = parallel(jobs)
@@ -923,21 +902,6 @@ def compute_nhd_routing_v02(
         results = []
         for order in subnetworks_only_ordered_jit:
             results.extend(results_subn[order])
-        
-        reaches_list = results[0][0]
-        streamflow_list = results[0][1]
-
-        # Create shared memory for 'streamflow_list' because multiprocessing doesn't allow write 
-        shm = shared_memory.SharedMemory(create=True, size=streamflow_list.nbytes)
-        shared_values = np.ndarray(streamflow_list.shape, dtype=streamflow_list.dtype, buffer=shm.buf)
-        shared_values[:] = streamflow_list[:]  # copy initial contents
-
-        with Parallel(n_jobs=cpu_pool, backend="loky") as parallel:
-            parallel(delayed(interpolation_shared)(k,v, shm.name, reaches_list, shared_values.shape, shared_values.dtype) for k,v in pseudo_headwater_dict.items())
-        results[0][1][:] = shared_values[:]
-        shm.close()
-        shm.unlink() 
-
 
         if 1 == 1:
             LOG.info("PARALLEL TIME %s seconds." % (time.time() - start_para_time))
@@ -1214,8 +1178,7 @@ def compute_nhd_routing_v02(
                             },
                             assume_short_ts,
                             return_courant,
-                            from_files=from_files,
-                            giuh_node=giuh_node
+                            from_files=from_files
                         )
                     )
 
@@ -1425,8 +1388,7 @@ def compute_nhd_routing_v02(
                         {},
                         assume_short_ts,
                         return_courant,
-                        from_files=from_files,
-                        giuh_node=giuh_node
+                        from_files=from_files
                     )
                 )
 
@@ -1610,8 +1572,7 @@ def compute_nhd_routing_v02(
                     {},
                     assume_short_ts,
                     return_courant,
-                    from_files=from_files,
-                    giuh_node=giuh_node
+                    from_files=from_files
                 )
             )
 
@@ -1770,8 +1731,7 @@ def compute_nhd_routing_v02(
                         if us in offnetwork_upstreams
                     },
                     assume_short_ts,
-                    return_courant,
-                    giuh_node=giuh_node
+                    return_courant
                 )
             )
 
