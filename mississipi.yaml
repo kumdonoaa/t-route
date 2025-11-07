@@ -1,0 +1,89 @@
+# $ python3 -m nwm_routing -f -V4 ipu08b.yaml # CHANGE THIS
+#--------------------------------------------------------------------------------
+log_parameters:
+    #----------
+    showtiming: True
+    log_level : DEBUG
+    # log_directory: /ngen/t-route-files/ipu_01/logs/
+#--------------------------------------------------------------------------------
+network_topology_parameters:
+    #----------
+    supernetwork_parameters:
+        #----------
+        geo_file_path: /home/quinn/t-route/conus_datastream/RouteLink_CONUS.nc  
+        mask_file_path: /home/quinn/t-route/conus_datastream/ipu_runs/mask_files/reaches08b.txt # CHANGE THIS
+        network_type: 'NHDNetwork'
+        columns: 
+            key: 'link'
+            downstream: 'to'
+            dx : 'Length'
+            n : 'n'
+            ncc : 'nCC'
+            s0 : 'So'
+            bw : 'BtmWdth'
+            waterbody : 'NHDWaterbodyComID'
+            gages : 'gages'
+            tw : 'TopWdth'
+            twcc : 'TopWdthCC'
+            musk : 'MusK'
+            musx : 'MusX'
+            cs : 'ChSlp'
+            alt: 'alt'
+    synthetic_wb_segments:
+        default_factory=lambda: [
+            4800002,
+            4800004,
+            4800006,
+            4800007,
+        ]
+    waterbody_parameters:
+        #----------
+        break_network_at_waterbodies: False 
+#--------------------------------------------------------------------------------
+compute_parameters:
+    #----------
+    parallel_compute_method: by-subnetwork-jit-clustered # CHANGE THIS
+    compute_kernel         : V02-structured
+    assume_short_ts        : False
+    subnetwork_target_size : 1000 # according to t-route this is the most efficient for conus-wide simulations
+    cpu_pool               : 60 #CHANGE THIS
+    restart_parameters:
+        #----------
+        start_datetime: 1979-02-06_18:00 
+        # lite_channel_restart_file: /ngen/t-route-files/warmstate-2002/restart/channel_restart_200204171700
+    forcing_parameters:
+        #----------
+        qts_subdivisions            : 12 # 3600 / 300 = 12 (dt_qlateral / dt = qts_subdivisions)
+        dt                          : 300 # [sec]
+        qlat_input_folder           : /home/quinn/t-route-inputs/
+        qlat_file_pattern_filter    : "*.CHRTOUT_DOMAIN1"
+        nts                         : 2016 # 288 for 1day
+        max_loop_size               : 168  # [hr]  168 hours for one week
+    data_assimilation_parameters:
+        streamflow_da:
+            #----------
+            streamflow_nudging            : False
+            diffusive_streamflow_nudging  : False                  
+        reservoir_da:
+            #----------
+            reservoir_persistence_da:
+                #----------
+                reservoir_persistence_usgs  : False
+                reservoir_persistence_usace : False
+                reservoir_persistence_greatLake : False
+            reservoir_rfc_da:
+                #----------
+                reservoir_rfc_forecasts                 : False
+                reservoir_rfc_forecasts_time_series_path: rfc_TimeSeries/
+                reservoir_rfc_forecasts_lookback_hours  : 48
+            
+#--------------------------------------------------------------------------------
+output_parameters:
+#     #----------
+    stream_output: 
+        stream_output_directory: /home/quinn/Contribute_troute/t-route/Not_Fixed # CHANGE THIS
+        stream_output_time: -1 #[hr]
+        stream_output_type: '.nc' #please select only between netcdf '.nc' or '.csv' or '.pkl'
+        stream_output_internal_frequency: 60 #[min] it should be order of 5 minutes. For instance if you want to output every hour put 60
+    lite_restart:
+        lite_restart_output_directory: /home/quinn/Contribute_troute/t-route/Restart/ # CHANGE THIS
