@@ -34,6 +34,10 @@ fi
 #export LIBRARY_PATH=<paths>:$LIBRARY_PATH
 #if you have custom dynamic library paths, uncomment below and export them
 #export LD_LIBRARY_PATHS=<paths>:$LD_LIBRARY_PATHS
+export LD_LIBRARY_PATH="$CONDA_PREFIX/lib/:$LD_LIBRARY_PATH"
+#export NETCDF="/home/dongha.kim/miniconda-template/miniconda3/include/" 
+export NETCDF="$CONDA_PREFIX/include/" 
+
 if [ -z "$NETCDF" ]
 then
     export NETCDFINC=/usr/include/openmpi-x86_64/
