@@ -33,9 +33,9 @@ fi
 #if you have custom static library paths, uncomment below and export them
 #export LIBRARY_PATH=<paths>:$LIBRARY_PATH
 #Or if you have custom dynamic library paths, uncomment below and export them
-#export LD_LIBRARY_PATHS=<paths>:$LD_LIBRARY_PATHS
-#export LD_LIBRARY_PATH="$CONDA_PREFIX/lib/:$LD_LIBRARY_PATH"
-#export NETCDF="$CONDA_PREFIX/include/" 
+#export LD_LIBRARY_PATH ="<paths>/lib/:$LD_LIBRARY_PATH"
+#if you have custom NETCDF paths, uncomment below and export them
+#export NETCDF= "<path>/include/" 
 
 
 if [ -z "$NETCDF" ]
